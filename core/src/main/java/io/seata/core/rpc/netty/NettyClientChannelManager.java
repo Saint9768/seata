@@ -108,6 +108,7 @@ class NettyClientChannelManager {
             LOGGER.info("will connect to {}", serverAddress);
         }
         Object lockObj = CollectionUtils.computeIfAbsent(channelLocks, serverAddress, key -> new Object());
+        // 加锁的方式建立连接
         synchronized (lockObj) {
             return doConnect(serverAddress);
         }
@@ -168,16 +169,25 @@ class NettyClientChannelManager {
     void reconnect(String transactionServiceGroup) {
         List<String> availList = null;
         try {
+            // 根据事务分组名获取可用的seata-server的地址列表
+            /**
+             * service {
+             *   vgroupMapping.saint-trade-tx-group = "seata-server-sh"
+             *   seata-server-sh.grouplist = "127.0.0.1:8091"
+             *   }
+             */
             availList = getAvailServerList(transactionServiceGroup);
         } catch (Exception e) {
             LOGGER.error("Failed to get available servers: {}", e.getMessage(), e);
             return;
         }
+        // 如果可用的seata-server服务地址列表为空（一般不会为空）
         if (CollectionUtils.isEmpty(availList)) {
             RegistryService registryService = RegistryFactory.getInstance();
             String clusterName = registryService.getServiceGroup(transactionServiceGroup);
 
             if (StringUtils.isBlank(clusterName)) {
+                // 这个报错眼熟吧（踩过的坑呀），就是找不到可用的seata-server地址
                 LOGGER.error("can not get cluster name in registry config '{}{}', please make sure registry config correct",
                         ConfigurationKeys.SERVICE_GROUP_MAPPING_PREFIX,
                         transactionServiceGroup);
@@ -191,8 +201,10 @@ class NettyClientChannelManager {
         }
         Set<String> channelAddress = new HashSet<>(availList.size());
         try {
+            // 尝试和每个seata server建立长连接
             for (String serverAddress : availList) {
                 try {
+                    // 和seata-server建立一个channel长链接
                     acquireChannel(serverAddress);
                     channelAddress.add(serverAddress);
                 } catch (Exception e) {
@@ -233,7 +245,9 @@ class NettyClientChannelManager {
         }
         Channel channelFromPool;
         try {
+            // 获取一个消息
             NettyPoolKey currentPoolKey = poolKeyFunction.apply(serverAddress);
+            // TM注册请求
             if (currentPoolKey.getMessage() instanceof RegisterTMRequest) {
                 poolKeyMap.put(serverAddress, currentPoolKey);
             } else {
@@ -243,6 +257,7 @@ class NettyClientChannelManager {
                     ((RegisterRMRequest) previousPoolKey.getMessage()).setResourceIds(registerRMRequest.getResourceIds());
                 }
             }
+            // 真正建立连接
             channelFromPool = nettyClientKeyPool.borrowObject(poolKeyMap.get(serverAddress));
             channels.put(serverAddress, channelFromPool);
         } catch (Exception exx) {
@@ -253,6 +268,8 @@ class NettyClientChannelManager {
     }
 
     private List<String> getAvailServerList(String transactionServiceGroup) throws Exception {
+        // RegistryFactory.getInstance()构建seata注册中心组件
+        // lookup()方法：seata-server的寻址（分配置方式而言，可以是file、nacos等等）
         List<InetSocketAddress> availInetSocketAddressList = RegistryFactory.getInstance()
                 .lookup(transactionServiceGroup);
         if (CollectionUtils.isEmpty(availInetSocketAddressList)) {

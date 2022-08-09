@@ -75,6 +75,7 @@ public final class TmNettyRemotingClient extends AbstractNettyRemotingClient {
                                   EventExecutorGroup eventExecutorGroup,
                                   ThreadPoolExecutor messageExecutor) {
         super(nettyClientConfig, eventExecutorGroup, messageExecutor, NettyPoolKey.TransactionRole.TMROLE);
+        // 安全认证数组签名signer组件
         this.signer = EnhancedServiceLoader.load(AuthSigner.class);
         // set enableClientBatchSendRequest
         this.enableClientBatchSendRequest = ConfigurationFactory.getInstance().getBoolean(ConfigurationKeys.ENABLE_TM_CLIENT_BATCH_SEND_REQUEST,
@@ -126,9 +127,11 @@ public final class TmNettyRemotingClient extends AbstractNettyRemotingClient {
      * @return the instance
      */
     public static TmNettyRemotingClient getInstance() {
+        // DCL获取单例TmNettyRemotingClient
         if (instance == null) {
             synchronized (TmNettyRemotingClient.class) {
                 if (instance == null) {
+                    // Netty客户端配置
                     NettyClientConfig nettyClientConfig = new NettyClientConfig();
                     final ThreadPoolExecutor messageExecutor = new ThreadPoolExecutor(
                             nettyClientConfig.getClientWorkerThreads(), nettyClientConfig.getClientWorkerThreads(),
@@ -190,11 +193,17 @@ public final class TmNettyRemotingClient extends AbstractNettyRemotingClient {
 
     @Override
     public void init() {
-        // registry processor
+        // registry processor，注册一些请求处理组件
+        //  seata server是可以主动给seata client发送请求过来的，对于netty里收到不同的请求需要有不同的请求处理组件；
         registerProcessor();
         if (initialized.compareAndSet(false, true)) {
+
+            // 定时对tx事务组进行重连、请求超时检查，启动netty客户端组件
             super.init();
+
+            // 如果事务分组不为空
             if (io.seata.common.util.StringUtils.isNotBlank(transactionServiceGroup)) {
+                // 通过长连接管理组件对事务分组建立一个长连接
                 getClientChannelManager().reconnect(transactionServiceGroup);
             }
         }

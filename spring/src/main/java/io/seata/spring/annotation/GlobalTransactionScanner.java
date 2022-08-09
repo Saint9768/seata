@@ -70,6 +70,13 @@ import static io.seata.common.DefaultValues.DEFAULT_TX_GROUP_OLD;
 
 /**
  * The type Global transaction scanner.
+ * 伴随着Spring容器初始化完毕，会调用这个Bean的初始化逻辑，进而初始化seata client
+ *
+ * AbstractAutoProxyCreator -- Spring框架内动态代理创建组件
+ *   ConfigurationChangeListener：关注配置变更事件监听器
+ *   InitializingBean：Bean初始化回调
+ *   ApplicationContextAware： 感知到SPring容器
+ *   DisposableBean：支持可抛弃Bean
  *
  * @author slievrly
  */
@@ -92,22 +99,38 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
     private static final Set<String> EXCLUDE_BEAN_NAME_SET = new HashSet<>();
     private static final Set<ScannerChecker> SCANNER_CHECKER_SET = new LinkedHashSet<>();
 
+    // Spring容器
     private static ConfigurableListableBeanFactory beanFactory;
 
+    // AOP里面对方法进行拦截的拦截器
     private MethodInterceptor interceptor;
+    // 针对@GlobalTransactional注解方法的AOP拦截器
     private MethodInterceptor globalTransactionalInterceptor;
 
+    // 应用程id，在xml里配置注入进来的
     private final String applicationId;
+
+    // 分布式事务组
     private final String txServiceGroup;
+
+    // 分布式事务模式，默认是AT模式
     private final int mode;
+
+    // 阿里云里的两个概念，阿里云里进行身份认证和安全访问需要用到的东西
     private static String accessKey;
     private static String secretKey;
+
+    // 是否禁用全局事务，默认是FALSE；
     private volatile boolean disableGlobalTransaction = ConfigurationFactory.getInstance().getBoolean(
             ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION, DEFAULT_DISABLE_GLOBAL_TRANSACTION);
+
+    // 通过CAS + Atomic变量保证即使在多线程环境下，初始化也仅会进行一次；即只有一个线程可以成功的初始化；
     private final AtomicBoolean initialized = new AtomicBoolean(false);
 
+    // 失败时的处理组件，全局事务开启、提交、回滚、回滚重试失败的回调入口
     private final FailureHandler failureHandlerHook;
 
+    // Spring容器
     private ApplicationContext applicationContext;
 
 
@@ -173,6 +196,7 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
     public GlobalTransactionScanner(String applicationId, String txServiceGroup, int mode,
                                     FailureHandler failureHandlerHook) {
         setOrder(ORDER_NUM);
+        // 启动 对目标Class创建动态代理
         setProxyTargetClass(true);
         this.applicationId = applicationId;
         this.txServiceGroup = txServiceGroup;
@@ -198,11 +222,17 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
         GlobalTransactionScanner.secretKey = secretKey;
     }
 
+    /**
+     * DisposableBean回调接口，Spring容器销毁（程序停止运行时），做一些资源的销毁和释放
+     */
     @Override
     public void destroy() {
         ShutdownHook.getInstance().destroyAll();
     }
 
+    /**
+     * 初始化Seata客户端， 和 Seata Server建立长连接；
+     */
     private void initClient() {
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("Initializing Global Transaction Clients ... ");
@@ -230,6 +260,8 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("Global Transaction Clients are initialized. ");
         }
+
+        // 注册Spring容器销毁回调
         registerSpringShutdownHook();
 
     }
@@ -498,8 +530,12 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
         return new Object[]{interceptor};
     }
 
+    /**
+     * InitializingBean回调接口，Spring容器启动和Bean初始化完毕之后的一个回调
+     */
     @Override
     public void afterPropertiesSet() {
+        // 看看是否禁用了全局事务
         if (disableGlobalTransaction) {
             if (LOGGER.isInfoEnabled()) {
                 LOGGER.info("Global transaction is disabled.");
@@ -508,7 +544,9 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
                     (ConfigurationChangeListener)this);
             return;
         }
+        // CAS保证初始化方法只会被调用一次；
         if (initialized.compareAndSet(false, true)) {
+            // 初始化seata Client
             initClient();
         }
     }

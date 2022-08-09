@@ -108,12 +108,17 @@ public class NettyClientBootstrap implements RemotingBootstrap {
                 new NamedThreadFactory(getThreadPrefix(nettyClientConfig.getClientWorkerThreadPrefix()),
                     nettyClientConfig.getClientWorkerThreads()));
         }
-        this.bootstrap.group(this.eventLoopGroupWorker).channel(
-            nettyClientConfig.getClientChannelClazz()).option(
-            ChannelOption.TCP_NODELAY, true).option(ChannelOption.SO_KEEPALIVE, true).option(
-            ChannelOption.CONNECT_TIMEOUT_MILLIS, nettyClientConfig.getConnectTimeoutMillis()).option(
-            ChannelOption.SO_SNDBUF, nettyClientConfig.getClientSocketSndBufSize()).option(ChannelOption.SO_RCVBUF,
-            nettyClientConfig.getClientSocketRcvBufSize());
+
+        // 真正的基于netty API构建一个bootstrap
+        this.bootstrap
+                // 设置对应的NioEventGroup，工作线程组，默认一个线程就够了
+                .group(this.eventLoopGroupWorker)
+                .channel(nettyClientConfig.getClientChannelClazz())
+                .option(ChannelOption.TCP_NODELAY, true)
+                .option(ChannelOption.SO_KEEPALIVE, true)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, nettyClientConfig.getConnectTimeoutMillis())
+                .option(ChannelOption.SO_SNDBUF, nettyClientConfig.getClientSocketSndBufSize())
+                .option(ChannelOption.SO_RCVBUF, nettyClientConfig.getClientSocketRcvBufSize());
 
         if (nettyClientConfig.enableNative()) {
             if (PlatformDependent.isOsx()) {
@@ -126,15 +131,19 @@ public class NettyClientBootstrap implements RemotingBootstrap {
             }
         }
 
+        // netty网络通信数据处理组件（PipeLine）进行初始化
         bootstrap.handler(
             new ChannelInitializer<SocketChannel>() {
                 @Override
                 public void initChannel(SocketChannel ch) {
                     ChannelPipeline pipeline = ch.pipeline();
-                    pipeline.addLast(
-                        new IdleStateHandler(nettyClientConfig.getChannelMaxReadIdleSeconds(),
+                    // IdleStateHandler，空闲状态检查Handler，如果有数据通过 记录一下数据通过的时间
+                    // 如果超过很长时间都空闲，没有数据过来，则触发一个user triggered event给ClientHandler进行处理
+                    pipeline.addLast(new IdleStateHandler(
+                            nettyClientConfig.getChannelMaxReadIdleSeconds(),
                             nettyClientConfig.getChannelMaxWriteIdleSeconds(),
                             nettyClientConfig.getChannelMaxAllIdleSeconds()))
+                        // 基于seata通信协议的编码器和解码器
                         .addLast(new ProtocolV1Decoder())
                         .addLast(new ProtocolV1Encoder());
                     if (channelHandlers != null) {

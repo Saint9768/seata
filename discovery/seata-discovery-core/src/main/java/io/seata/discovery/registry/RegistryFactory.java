@@ -39,7 +39,9 @@ public class RegistryFactory {
     }
 
     private static RegistryService buildRegistryService() {
+        // seata是如何构建注册中心组件
         RegistryType registryType;
+        // 拿到seata注册中心的类型
         String registryTypeName = ConfigurationFactory.CURRENT_FILE_INSTANCE.getConfig(
             ConfigurationKeys.FILE_ROOT_REGISTRY + ConfigurationKeys.FILE_CONFIG_SPLIT_CHAR
                 + ConfigurationKeys.FILE_ROOT_TYPE);
@@ -48,6 +50,7 @@ public class RegistryFactory {
         } catch (Exception exx) {
             throw new NotSupportYetException("not support registry type: " + registryTypeName);
         }
+        // 拿到注册中心的类型 再结合SPI机制找到相应的RegistryProvider。
         return EnhancedServiceLoader.load(RegistryProvider.class, Objects.requireNonNull(registryType).name()).provide();
 
     }

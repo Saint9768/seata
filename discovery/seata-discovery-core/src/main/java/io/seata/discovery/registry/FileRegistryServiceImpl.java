@@ -79,10 +79,13 @@ public class FileRegistryServiceImpl implements RegistryService<ConfigChangeList
 
     @Override
     public List<InetSocketAddress> lookup(String key) throws Exception {
+        // 从配置中获取当前事务组名称
         String clusterName = getServiceGroup(key);
         if (clusterName == null) {
             return null;
         }
+
+        // 获取事务组对应的seata-server地址列表
         String endpointStr = CONFIG.getConfig(
                 PREFIX_SERVICE_ROOT + CONFIG_SPLIT_CHAR + clusterName + POSTFIX_GROUPLIST);
         if (StringUtils.isNullOrEmpty(endpointStr)) {

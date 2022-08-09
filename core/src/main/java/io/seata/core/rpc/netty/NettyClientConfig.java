@@ -33,6 +33,7 @@ import static io.seata.common.DefaultValues.DEFAULT_WORKER_THREAD_PREFIX;
  */
 public class NettyClientConfig extends NettyBaseConfig {
 
+    // 连接超时时间
     private int connectTimeoutMillis = 10000;
     private int clientSocketSndBufSize = 153600;
     private int clientSocketRcvBufSize = 153600;

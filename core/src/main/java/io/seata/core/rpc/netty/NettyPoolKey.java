@@ -24,8 +24,11 @@ import io.seata.core.protocol.AbstractMessage;
  */
 public class NettyPoolKey {
 
+    // 事务角色，比如TM、RM
     private TransactionRole transactionRole;
+    // seata server地址
     private String address;
+    // 消息
     private AbstractMessage message;
 
     /**

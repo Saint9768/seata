@@ -480,7 +480,11 @@ public class EnhancedServiceLoader {
         private List<ExtensionDefinition<S>> findAllExtensionDefinition(ClassLoader loader) {
             List<ExtensionDefinition<S>> extensionDefinitions = new ArrayList<>();
             try {
+                // SPI扩展机制和dubbo一样
+                // 对于很多关键组件，都由接口定义；运行过程中可以针对接口去实现动态的扩展；下面两个目录都可以
+                // 在resources/META-INF/services/目录下创建一个以接口命名的文件，文件内容为接口实现类
                 loadFile(SERVICES_DIRECTORY, loader, extensionDefinitions);
+                // // 在resources/META-INF/seata/目录下创建一个以接口命名的文件，文件内容为接口实现类
                 loadFile(SEATA_DIRECTORY, loader, extensionDefinitions);
             } catch (IOException e) {
                 throw new EnhancedServiceNotFoundException(e);

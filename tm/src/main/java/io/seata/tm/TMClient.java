@@ -44,6 +44,7 @@ public class TMClient {
      */
     public static void init(String applicationId, String transactionServiceGroup, String accessKey, String secretKey) {
         TmNettyRemotingClient tmNettyRemotingClient = TmNettyRemotingClient.getInstance(applicationId, transactionServiceGroup, accessKey, secretKey);
+        // TmNettyRemotingClient初始化
         tmNettyRemotingClient.init();
     }
 
