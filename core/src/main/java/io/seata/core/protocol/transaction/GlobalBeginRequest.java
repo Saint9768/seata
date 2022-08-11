@@ -21,6 +21,9 @@ import io.seata.core.rpc.RpcContext;
 /**
  * The type Global begin request.
  *
+ * GlobalBeginRequest需要经过序列化变成字节数组，再结合seata通信协议，通过netty发送到seata server里去
+ * AbstractTransactionRequestToTC是针对Seata-server的请求
+ *
  * @author slievrly
  */
 public class GlobalBeginRequest extends AbstractTransactionRequestToTC {

@@ -58,20 +58,29 @@ public class Server {
         ParameterParser parameterParser = new ParameterParser(args);
 
         //initialize the metrics
+        // seata server支持metric指标采集（一带而过即可）
         MetricsManager.get().init();
 
         System.setProperty(ConfigurationKeys.STORE_MODE, parameterParser.getStoreMode());
 
+        // seata server里netty server 的io线程池（核心线程数50，最大线程数100）
         ThreadPoolExecutor workingThreads = new ThreadPoolExecutor(NettyServerConfig.getMinServerPoolSize(),
-                NettyServerConfig.getMaxServerPoolSize(), NettyServerConfig.getKeepAliveTime(), TimeUnit.SECONDS,
+                NettyServerConfig.getMaxServerPoolSize(),
+                NettyServerConfig.getKeepAliveTime(),
+                TimeUnit.SECONDS,
                 new LinkedBlockingQueue<>(NettyServerConfig.getMaxTaskQueueSize()),
                 new NamedThreadFactory("ServerHandlerThread", NettyServerConfig.getMaxServerPoolSize()), new ThreadPoolExecutor.CallerRunsPolicy());
 
+        // 创建netty网络通信的服务器
         NettyRemotingServer nettyRemotingServer = new NettyRemotingServer(workingThreads);
+
+        // 初始化UUID生成器（雪花算法）
         UUIDGenerator.init(parameterParser.getServerNode());
         //log store mode : file, db, redis
         SessionHolder.init(parameterParser.getSessionStoreMode());
         LockerManagerFactory.init(parameterParser.getLockStoreMode());
+
+        // 默认协调者，后台启动的一堆线程
         DefaultCoordinator coordinator = DefaultCoordinator.getInstance(nettyRemotingServer);
         coordinator.init();
         nettyRemotingServer.setHandler(coordinator);

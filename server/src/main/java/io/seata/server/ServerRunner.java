@@ -28,6 +28,8 @@ import org.springframework.stereotype.Component;
 
 
 /**
+ * CommandLineRunner接口主要用于实现在Spring容器初始化后执行，并且在整个应用生命周期内只会执行一次
+ *
  * @author spilledyear@outlook.com
  */
 @Component

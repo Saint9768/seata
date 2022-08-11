@@ -98,6 +98,8 @@ public class RootContext {
      */
     @Nullable
     public static String getXID() {
+        // CONTEXT_HOLDER是一个接口ContextCore，通过SPI机制拿到它的实现；
+        // 其实就是通过ThreadLocal封装了一个Map，通过key（TX_XID）拿到它的value值
         return (String) CONTEXT_HOLDER.get(KEY_XID);
     }
 

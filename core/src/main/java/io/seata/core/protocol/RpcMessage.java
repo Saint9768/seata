@@ -22,6 +22,7 @@ import java.util.Map;
 
 /**
  * The type Rpc message.
+ * RPC Message是seata进行网络通信的协议，其中规定了数据是如何被组织的；
  *
  * @author slievrly
  */
@@ -31,7 +32,9 @@ public class RpcMessage {
     private byte messageType;
     private byte codec;
     private byte compressor;
+    // 自定义的头信息
     private Map<String, String> headMap = new HashMap<>();
+    // 消息体
     private Object body;
 
     /**

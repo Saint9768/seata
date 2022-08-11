@@ -34,6 +34,7 @@ public class RoundRobinLoadBalance implements LoadBalance {
 
     @Override
     public <T> T select(List<T> invokers, String xid) {
+        // 轮询算法中并没有使用到xid
         int length = invokers.size();
         return invokers.get(getPositiveSequence() % length);
     }

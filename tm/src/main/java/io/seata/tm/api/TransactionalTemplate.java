@@ -54,16 +54,21 @@ public class TransactionalTemplate {
             throw new ShouldNeverHappenException("transactionInfo does not exist");
         }
         // 1.1 Get current transaction, if not null, the tx role is 'GlobalTransactionRole.Participant'.
+        // 获取当前事务，根据ThreadLocal，获取当前线程本地变量副本中的xid，进而判断是否存在一个全局事务
+        // 刚开始一个全局事务时，肯定是没有全局事务的
         GlobalTransaction tx = GlobalTransactionContext.getCurrent();
 
         // 1.2 Handle the transaction propagation.
+        // 从全局事务的配置里 获取事务传播级别，默认是REQUIRED（如果存在则加入，否则开启一个新的）
         Propagation propagation = txInfo.getPropagation();
         SuspendedResourcesHolder suspendedResourcesHolder = null;
         try {
+            // 根据事务的隔离级别做不同的处理
             switch (propagation) {
                 case NOT_SUPPORTED:
                     // If transaction is existing, suspend it.
                     if (existingTransaction(tx)) {
+                        // 事务存在，则挂起事务（默认将xid从RootContext中移除）
                         suspendedResourcesHolder = tx.suspend();
                     }
                     // Execute without transaction and return.
@@ -110,6 +115,7 @@ public class TransactionalTemplate {
 
             // 1.3 If null, create new transaction with role 'GlobalTransactionRole.Launcher'.
             if (tx == null) {
+                // 创建全局事务（角色为事务发起者），并关联全局事务管理器
                 tx = GlobalTransactionContext.createNew();
             }
 
@@ -119,24 +125,30 @@ public class TransactionalTemplate {
             try {
                 // 2. If the tx role is 'GlobalTransactionRole.Launcher', send the request of beginTransaction to TC,
                 //    else do nothing. Of course, the hooks will still be triggered.
+                // 开启全局事务，如果事务角色是'GlobalTransactionRole.Launcher'，发送开始事务请求到seata-server(TC)
                 beginTransaction(txInfo, tx);
 
                 Object rs;
                 try {
                     // Do Your Business
+                    // 执行业务方法，把全局事务ID通过 MVC拦截器 / dubbo filter传递到后面的分支事务；
+                    // 每个分支事务都会去运行
                     rs = business.execute();
                 } catch (Throwable ex) {
                     // 3. The needed business exception to rollback.
+                    // 如果全局事务执行发生了异常，则回滚；
                     completeTransactionAfterThrowing(txInfo, tx, ex);
                     throw ex;
                 }
 
                 // 4. everything is fine, commit.
+                // 全局事务和分支事务运行无误，提交事务；
                 commitTransaction(tx);
 
                 return rs;
             } finally {
                 //5. clear
+                // 全局事务完成之后做一些清理工作
                 resumeGlobalLockConfig(previousConfig);
                 triggerAfterCompletion();
                 cleanUp();
@@ -144,6 +156,7 @@ public class TransactionalTemplate {
         } finally {
             // If the transaction is suspended, resume it.
             if (suspendedResourcesHolder != null) {
+                // 如果有挂起的全局事务，则恢复全局事务
                 tx.resume(suspendedResourcesHolder);
             }
         }
@@ -211,8 +224,11 @@ public class TransactionalTemplate {
 
     private void beginTransaction(TransactionInfo txInfo, GlobalTransaction tx) throws TransactionalExecutor.ExecutionException {
         try {
+            // 开启全局事务之前会有一个回调钩子
             triggerBeforeBegin();
+            // 开启全局事务
             tx.begin(txInfo.getTimeOut(), txInfo.getName());
+            // 开启全局事务之后的回调钩子
             triggerAfterBegin();
         } catch (TransactionException txe) {
             throw new TransactionalExecutor.ExecutionException(tx, txe,

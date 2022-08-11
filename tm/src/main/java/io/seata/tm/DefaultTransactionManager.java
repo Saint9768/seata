@@ -47,9 +47,12 @@ public class DefaultTransactionManager implements TransactionManager {
     @Override
     public String begin(String applicationId, String transactionServiceGroup, String name, int timeout)
         throws TransactionException {
+        // 构建全局事务开启请求；
+        // GlobalBeginRequest需要经过序列化变成字节数组，再结合seata通信协议，通过netty发送到seata server里去
         GlobalBeginRequest request = new GlobalBeginRequest();
         request.setTransactionName(name);
         request.setTimeout(timeout);
+        // 发送请求，同步调用
         GlobalBeginResponse response = (GlobalBeginResponse) syncCall(request);
         if (response.getResultCode() == ResultCode.Failed) {
             throw new TmTransactionException(TransactionExceptionCode.BeginFailed, response.getMsg());
@@ -92,6 +95,8 @@ public class DefaultTransactionManager implements TransactionManager {
 
     private AbstractTransactionResponse syncCall(AbstractTransactionRequest request) throws TransactionException {
         try {
+            // TmNettyRemotingClient中对每个seata-server都建立了长连接
+            // sendSyncRequest()方法中会对seata-server做负载均衡
             return (AbstractTransactionResponse) TmNettyRemotingClient.getInstance().sendSyncRequest(request);
         } catch (TimeoutException toe) {
             throw new TmTransactionException(TransactionExceptionCode.IO, "RPC timeout", toe);

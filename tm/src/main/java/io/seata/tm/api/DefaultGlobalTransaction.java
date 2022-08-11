@@ -60,6 +60,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
      * Instantiates a new Default global transaction.
      */
     DefaultGlobalTransaction() {
+        // 全是事务的角色是全局事务发起者
         this(null, GlobalStatus.UnKnown, GlobalTransactionRole.Launcher);
     }
 
@@ -102,8 +103,11 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             throw new IllegalStateException("Global transaction already exists," +
                 " can't begin a new global transaction, currentXid = " + currentXid);
         }
+        // 通过全局事务管理组件去真正开启一个全局事务（想seata-server发送请求）；
+        // 开启成功之后会获取到一个xid
         xid = transactionManager.begin(null, null, name, timeout);
         status = GlobalStatus.Begin;
+        // todo 开启全局事务之后，xid最初的绑定，绑定到ThreadLocal中
         RootContext.bind(xid);
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("Begin new global transaction [{}]", xid);

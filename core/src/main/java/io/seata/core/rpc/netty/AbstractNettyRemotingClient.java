@@ -113,6 +113,7 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
         timerExecutor.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
+                // 和seata-server建立链接
                 clientChannelManager.reconnect(getTransactionServiceGroup());
             }
         }, SCHEDULE_DELAY_MILLS, SCHEDULE_INTERVAL_MILLS, TimeUnit.MILLISECONDS);
@@ -146,8 +147,10 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
 
     @Override
     public Object sendSyncRequest(Object msg) throws TimeoutException {
+        // 对seata-server做负载均衡，seata-server是可以多节点部署的、实现高可用架构；某个节点宕机也没事
         String serverAddress = loadBalance(getTransactionServiceGroup(), msg);
         long timeoutMillis = this.getRpcRequestTimeout();
+        // 构建一个RPC消息
         RpcMessage rpcMessage = buildRequestMessage(msg, ProtocolConstants.MSGTYPE_RESQUEST_SYNC);
 
         // send batch message
@@ -264,7 +267,9 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
         InetSocketAddress address = null;
         try {
             @SuppressWarnings("unchecked")
+            // 找到存活的seata-server实例列表
             List<InetSocketAddress> inetSocketAddressList = RegistryFactory.getInstance().aliveLookup(transactionServiceGroup);
+            // 选择一个seata-server实例
             address = this.doSelect(inetSocketAddressList, msg);
         } catch (Exception ex) {
             LOGGER.error(ex.getMessage());
@@ -278,6 +283,7 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
     protected InetSocketAddress doSelect(List<InetSocketAddress> list, Object msg) throws Exception {
         if (CollectionUtils.isNotEmpty(list)) {
             if (list.size() > 1) {
+                // getXid(msg)：获取请求对应的全局事务xid
                 return LoadBalanceFactory.getInstance().select(list, getXid(msg));
             } else {
                 return list.get(0);

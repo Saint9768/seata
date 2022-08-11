@@ -19,15 +19,18 @@ import io.seata.tm.api.TransactionalExecutor;
 
 /**
  * Propagation level of global transactions.
+ * <p>
+ * 全局事务传播级别
  *
  * @author haozhibei
- * @see io.seata.spring.annotation.GlobalTransactional#propagation() // TM annotation
- * @see io.seata.spring.annotation.GlobalTransactionalInterceptor#invoke(MethodInvocation) // the interceptor of TM
+ * @see io.seata.spring.annotation .GlobalTransactional#propagation() // TM annotation
+ * @see io.seata.spring.annotation .GlobalTransactionalInterceptor#invoke(MethodInvocation) // the interceptor of TM
  * @see io.seata.tm.api.TransactionalTemplate#execute(TransactionalExecutor) // the transaction template of TM
  */
 public enum Propagation {
     /**
      * The REQUIRED.
+     * 如果全局事务已存在，则假如当前事务，作为一个分支事务；如果全局事务不存在，则开启一个全新的全局事务
      * The default propagation.
      *
      * <p>
@@ -58,6 +61,7 @@ public enum Propagation {
 
     /**
      * The REQUIRES_NEW.
+     * 如果全局事务已经存在，则暂停它，用新的事务来执行当前业务逻辑
      *
      * <p>
      * If transaction is existing, suspend it, and then execute business with new transaction.
@@ -92,6 +96,8 @@ public enum Propagation {
     /**
      * The NOT_SUPPORTED.
      *
+     * 如果全局事务已经存在，则暂停它，用非事务的方式执行
+     *
      * <p>
      * If transaction is existing, suspend it, and then execute business without transaction.
      * </p>
@@ -116,6 +122,7 @@ public enum Propagation {
 
     /**
      * The SUPPORTS.
+     * 如果全局事务不存在，则以非事务方式运行它；如果全局事务存在，则加入当前事务；
      *
      * <p>
      * If transaction is not existing, execute without global transaction,
@@ -137,6 +144,7 @@ public enum Propagation {
 
     /**
      * The NEVER.
+     * 存在全局事务，抛出异常；不存在全局事务，则以非事务的方式执行
      *
      * <p>
      * If transaction is existing, throw exception,
@@ -157,6 +165,7 @@ public enum Propagation {
 
     /**
      * The MANDATORY.
+     * 如果全局事务不存在，则抛出异常；如果全局事务存在，则加入当前事务；
      *
      * <p>
      * If transaction is not existing, throw exception,

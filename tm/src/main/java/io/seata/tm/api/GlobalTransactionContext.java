@@ -44,6 +44,7 @@ public class GlobalTransactionContext {
      * @return null if no transaction context there.
      */
     public static GlobalTransaction getCurrent() {
+        // 获取事务的xid
         String xid = RootContext.getXID();
         if (xid == null) {
             return null;

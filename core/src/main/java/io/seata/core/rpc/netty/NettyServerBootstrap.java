@@ -165,6 +165,7 @@ public class NettyServerBootstrap implements RemotingBootstrap {
             });
 
         try {
+            // 同步启动
             this.serverBootstrap.bind(getListenPort()).sync();
             XID.setPort(getListenPort());
             LOGGER.info("Server started, service listen port: {}", getListenPort());
