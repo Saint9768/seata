@@ -128,16 +128,22 @@ public class DefaultCore implements Core {
     @Override
     public String begin(String applicationId, String transactionServiceGroup, String name, int timeout)
         throws TransactionException {
+        // 创建一个全局事务会话
         GlobalSession session = GlobalSession.createGlobalSession(applicationId, transactionServiceGroup, name,
             timeout);
+        // 通过MDC把XID放入线程本地变量ThreadLocal中（MDC是Slf4j提供的工具）
         MDC.put(RootContext.MDC_KEY_XID, session.getXid());
+        // 添加对全局事务会话生命周期的监听
         session.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
 
+        // 开启全局事务会话
         session.begin();
 
         // transaction start event
+        // 发布全局事务开启事件 做指标监控
         MetricsPublisher.postSessionDoingEvent(session, false);
 
+        // 返回全局事务会话的xid
         return session.getXid();
     }
 

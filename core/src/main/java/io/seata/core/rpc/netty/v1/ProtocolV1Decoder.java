@@ -63,6 +63,8 @@ public class ProtocolV1Decoder extends LengthFieldBasedFrameDecoder {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ProtocolV1Decoder.class);
 
+    // 为了解决粘包和拆包的问题，基于 length field based frame decoder来实现
+    // 按照length frild来做整帧，对帧长度做解帧，确保拿到的是一个完整的帧和数据
     public ProtocolV1Decoder() {
         // default is 8M
         this(ProtocolConstants.MAX_FRAME_LENGTH);
@@ -76,17 +78,28 @@ public class ProtocolV1Decoder extends LengthFieldBasedFrameDecoder {
         int lengthAdjustment,   FullLength include all data and read 7 bytes before, so the left length is (FullLength-7). so values is -7
         int initialBytesToStrip we will check magic code and version self, so do not strip any bytes. so values is 0
         */
+        // 最大的帧长度是8MB（当然可以改源码），也就是说一个RPC消息数据不能超过8MB；
+        // 开头是2个字节的模式、1个字节的版本号，4个字节的full length（消息长度），所以消息的真实数据长度为FullLength-7
         super(maxFrameLength, 3, 4, -7, 0);
     }
 
+    /**
+     * 每一个整帧解出来之后，由当前Decoder负责解码、将字节数组转为PpcMessage对象
+     * @param ctx
+     * @param in
+     * @return
+     * @throws Exception
+     */
     @Override
     protected Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         Object decoded;
         try {
+            // 调用父类LengthFieldBasedFrameDecoder的decoded()方法先去解帧
             decoded = super.decode(ctx, in);
             if (decoded instanceof ByteBuf) {
                 ByteBuf frame = (ByteBuf)decoded;
                 try {
+                    // 真正的解码，将byte数组解析为相应的Object，即：RpcMessage
                     return decodeFrame(frame);
                 } finally {
                     frame.release();
@@ -140,13 +153,16 @@ public class ProtocolV1Decoder extends LengthFieldBasedFrameDecoder {
             if (bodyLength > 0) {
                 byte[] bs = new byte[bodyLength];
                 frame.readBytes(bs);
+                // 获取到压缩组件，对字节数组body进行解压缩操作
                 Compressor compressor = CompressorFactory.getCompressor(compressorType);
                 bs = compressor.decompress(bs);
+                // 对解压缩完之后的数据，根据序列化类型进行反序列化，以得到一个请求对象
                 Serializer serializer = SerializerServiceLoader.load(SerializerType.getByCode(rpcMessage.getCodec()));
                 rpcMessage.setBody(serializer.deserialize(bs));
             }
         }
 
+        // seata-server端消息解码完，进入到ServerHandler处理消息
         return rpcMessage;
     }
 }

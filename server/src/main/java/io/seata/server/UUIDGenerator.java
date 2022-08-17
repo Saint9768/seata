@@ -31,6 +31,7 @@ public class UUIDGenerator {
      * @return UUID
      */
     public static long generateUUID() {
+        // DCL + volatile ，实现并发场景下保证idWorker的单例特性
         if (idWorker == null) {
             synchronized (UUIDGenerator.class) {
                 if (idWorker == null) {
@@ -38,6 +39,7 @@ public class UUIDGenerator {
                 }
             }
         }
+        // 每次通过雪花算法实现的nextId()获取一个新的UUID
         return idWorker.nextId();
     }
 

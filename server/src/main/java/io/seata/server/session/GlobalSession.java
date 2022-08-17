@@ -192,6 +192,7 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
         this.status = GlobalStatus.Begin;
         this.beginTime = System.currentTimeMillis();
         this.active = true;
+        // 遍历所有的生成周期监听函数，执行begin事件
         for (SessionLifecycleListener lifecycleListener : lifecycleListeners) {
             lifecycleListener.onBegin(this);
         }
@@ -382,6 +383,7 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
      * @param lazyLoadBranch          the lazy load branch
      */
     public GlobalSession(String applicationId, String transactionServiceGroup, String transactionName, int timeout, boolean lazyLoadBranch) {
+        // 根据雪花算法创建一个全局事务ID
         this.transactionId = UUIDGenerator.generateUUID();
         this.status = GlobalStatus.Begin;
         this.lazyLoadBranch = lazyLoadBranch;
@@ -392,6 +394,7 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
         this.transactionServiceGroup = transactionServiceGroup;
         this.transactionName = transactionName;
         this.timeout = timeout;
+        // 根据全局事务ID，通过XID工具类生成一个xid，格式为IP:Port:transactionId
         this.xid = XID.generateXID(transactionId);
     }
 
@@ -561,6 +564,10 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
         this.active = active;
     }
 
+    /**
+     * 将事务的信息序列化成字节数组
+     * @return
+     */
     @Override
     public byte[] encode() {
         byte[] byApplicationIdBytes = applicationId != null ? applicationId.getBytes() : null;

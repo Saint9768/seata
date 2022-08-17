@@ -60,6 +60,7 @@ public class HeadMapSerializer {
                 writeString(out, value);
             }
         }
+        // 返回消息头的长度
         return out.writerIndex() - start;
     }
 

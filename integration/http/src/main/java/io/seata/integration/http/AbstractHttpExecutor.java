@@ -41,6 +41,7 @@ import java.util.Map;
 
 /**
  * Abstract http executor.
+ * 请求执行拦截器
  *
  * @author wangxb
  */
@@ -115,15 +116,18 @@ public abstract class AbstractHttpExecutor implements HttpExecutor {
     protected abstract <T> void buildClientEntity(CloseableHttpClient httpClient, T paramObject);
 
     private <K> K wrapHttpExecute(Class<K> returnType, CloseableHttpClient httpClient, HttpUriRequest httpUriRequest,
-            Map<String, String> headers) throws IOException {
+                                  Map<String, String> headers) throws IOException {
         CloseableHttpResponse response;
+        // 指定请求时，从线程本地变量中获取xid
         String xid = RootContext.getXID();
+        // 如果线程本地变量中有xid，则放到请求头中
         if (xid != null) {
             headers.put(RootContext.KEY_XID, xid);
         }
         if (!headers.isEmpty()) {
             headers.forEach(httpUriRequest::addHeader);
         }
+        // 执行http请求
         response = httpClient.execute(httpUriRequest);
         int statusCode = response.getStatusLine().getStatusCode();
         /** 2xx is success. */

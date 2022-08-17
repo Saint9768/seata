@@ -36,12 +36,15 @@ public class TransactionPropagationInterceptor extends HandlerInterceptorAdapter
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        // HTTP请求执行前，从线程本地变量副本从获取xid
         String xid = RootContext.getXID();
+        // 是否上游请求的请求头中包含rpcXid
         String rpcXid = request.getHeader(RootContext.KEY_XID);
 
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("xid in RootContext[{}] xid in HttpContext[{}]", xid, rpcXid);
         }
+        // 如果上游请求的请求头中包含xid，线程本地变量中不包含xid，则将rpcXid绑定到线程本地变量中
         if (StringUtils.isBlank(xid) && StringUtils.isNotBlank(rpcXid)) {
             RootContext.bind(rpcXid);
             if (LOGGER.isDebugEnabled()) {

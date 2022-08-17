@@ -53,6 +53,8 @@ public class XID {
      * @return the string
      */
     public static String generateXID(long tranId) {
+        // 拼接当前机器的IP地址、冒号:、端口号、冒号:、事务ID
+        // 即IP:Port:transactionId
         return new StringBuilder().append(ipAddress).append(IP_PORT_SPLIT_CHAR).append(port).append(IP_PORT_SPLIT_CHAR).append(tranId).toString();
     }
 

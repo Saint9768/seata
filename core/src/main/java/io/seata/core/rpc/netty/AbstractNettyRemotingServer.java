@@ -165,6 +165,7 @@ public abstract class AbstractNettyRemotingServer extends AbstractNettyRemoting 
             if (!(msg instanceof RpcMessage)) {
                 return;
             }
+            // 对Decoder解码完毕之后的RpcMessage进行处理
             processMessage(ctx, (RpcMessage) msg);
         }
 

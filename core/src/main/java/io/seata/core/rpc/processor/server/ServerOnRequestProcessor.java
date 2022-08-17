@@ -146,6 +146,7 @@ public class ServerOnRequestProcessor implements RemotingProcessor, Disposable {
 
     private void onRequestMessage(ChannelHandlerContext ctx, RpcMessage rpcMessage) {
         Object message = rpcMessage.getBody();
+        // RpcContext中存放和seata-server建立channel的seata-client信息
         RpcContext rpcContext = ChannelManager.getContextFromIdentified(ctx.channel());
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("server received:{},clientIp:{},vgroup:{}", message,

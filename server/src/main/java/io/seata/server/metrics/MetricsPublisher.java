@@ -65,6 +65,7 @@ public class MetricsPublisher {
      * @param retryBranch   the retry branch
      */
     public static void postSessionDoneEvent(final GlobalSession globalSession, String status, boolean retryGlobal, long beginTime, boolean retryBranch) {
+        // 底层使用Google guava的EventBus发布事件
         EVENT_BUS.post(new GlobalTransactionEvent(globalSession.getTransactionId(), GlobalTransactionEvent.ROLE_TC,
             globalSession.getTransactionName(), globalSession.getApplicationId(),
             globalSession.getTransactionServiceGroup(), beginTime, System.currentTimeMillis(), status, retryGlobal, retryBranch));

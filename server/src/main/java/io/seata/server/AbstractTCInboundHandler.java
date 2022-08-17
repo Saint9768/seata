@@ -61,6 +61,7 @@ public abstract class AbstractTCInboundHandler extends AbstractExceptionHandler 
             @Override
             public void execute(GlobalBeginRequest request, GlobalBeginResponse response) throws TransactionException {
                 try {
+                    // 开启全局事务
                     doGlobalBegin(request, response, rpcContext);
                 } catch (StoreException e) {
                     throw new TransactionException(TransactionExceptionCode.FailedStore,

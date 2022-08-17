@@ -122,6 +122,7 @@ public class ClientOnResponseProcessor implements RemotingProcessor {
                 mergeMsgMap.clear();
             }
         } else {
+            // 先将请求对应的rpcMessage从futures中移除，不再进行超时检查
             MessageFuture messageFuture = futures.remove(rpcMessage.getId());
             if (messageFuture != null) {
                 messageFuture.setResultMessage(rpcMessage.getBody());

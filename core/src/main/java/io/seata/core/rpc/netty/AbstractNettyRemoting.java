@@ -176,16 +176,21 @@ public abstract class AbstractNettyRemoting implements Disposable {
             return null;
         }
 
+        // 把发送出去的请求和MessageFuture封装到futures（用于检查请求超时）里面去，
         MessageFuture messageFuture = new MessageFuture();
         messageFuture.setRequestMessage(rpcMessage);
         messageFuture.setTimeout(timeoutMillis);
         futures.put(rpcMessage.getId(), messageFuture);
 
+        // 检查channel是否可以进行写入
         channelWritableCheck(channel, rpcMessage.getBody());
 
+        // channel的IP地址
         String remoteAddr = ChannelUtil.getAddressFromChannel(channel);
+        // rpc之前回调的钩子
         doBeforeRpcHooks(remoteAddr, rpcMessage);
 
+        // 异步化的发送数据出去，同时加上一个监听器，监听请求失败事件-进行回调
         channel.writeAndFlush(rpcMessage).addListener((ChannelFutureListener) future -> {
             if (!future.isSuccess()) {
                 MessageFuture messageFuture1 = futures.remove(rpcMessage.getId());
@@ -273,6 +278,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
         Object body = rpcMessage.getBody();
         if (body instanceof MessageTypeAware) {
             MessageTypeAware messageTypeAware = (MessageTypeAware) body;
+            // 根据消息的类型获取到请求处理组件和请求处理线程池组成的Pair
             final Pair<RemotingProcessor, ExecutorService> pair = this.processorTable.get((int) messageTypeAware.getTypeCode());
             if (pair != null) {
                 if (pair.getSecond() != null) {

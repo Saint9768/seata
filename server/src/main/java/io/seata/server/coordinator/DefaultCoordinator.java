@@ -230,11 +230,16 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
         branchRemoveExecutor.execute(new BranchRemoveTask(globalSession));
     }
 
+    // 全局事务开启
     @Override
     protected void doGlobalBegin(GlobalBeginRequest request, GlobalBeginResponse response, RpcContext rpcContext)
             throws TransactionException {
-        response.setXid(core.begin(rpcContext.getApplicationId(), rpcContext.getTransactionServiceGroup(),
-                request.getTransactionName(), request.getTimeout()));
+        // DefaultCore负责开启全局事务的业务逻辑，获取到一个xid设置到响应中。
+        response.setXid(core.begin(
+                rpcContext.getApplicationId(), // 应用程序ID
+                rpcContext.getTransactionServiceGroup(), // 事务服务分组
+                request.getTransactionName(), // 事务名称
+                request.getTimeout())); // 事务超时时间
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("Begin new global transaction applicationId: {},transactionServiceGroup: {}, transactionName: {},timeout:{},xid:{}",
                     rpcContext.getApplicationId(), rpcContext.getTransactionServiceGroup(), request.getTransactionName(), request.getTimeout(), response.getXid());

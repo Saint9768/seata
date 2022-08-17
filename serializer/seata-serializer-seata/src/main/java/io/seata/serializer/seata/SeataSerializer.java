@@ -50,7 +50,9 @@ public class SeataSerializer implements Serializer {
 
         //typecode + body
         ByteBuffer byteBuffer = ByteBuffer.allocate(2 + body.length);
+        // 先使用两字节写入当前序列化的类型
         byteBuffer.putShort(typecode);
+        // 序列化后的内容
         byteBuffer.put(body);
 
         byteBuffer.flip();

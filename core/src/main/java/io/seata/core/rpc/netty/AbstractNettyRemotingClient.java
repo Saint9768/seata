@@ -155,6 +155,7 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
 
         // send batch message
         // put message into basketMap, @see MergedSendRunnable
+        // 是否是批量发送请求
         if (this.isEnableClientBatchSendRequest()) {
 
             // send batch message is sync request, needs to create messageFuture and put it in futures.
@@ -193,7 +194,9 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
             }
 
         } else {
+            // 通过网络连接管理组件，获取到和指定seata server地址的网络连接channel
             Channel channel = clientChannelManager.acquireChannel(serverAddress);
+            // 通过网络连接channel将rpcMessage发送到seata server
             return super.sendSync(channel, rpcMessage, timeoutMillis);
         }
 
