@@ -79,6 +79,7 @@ public abstract class AbstractDMLBaseExecutor<T, S extends Statement> extends Ba
     public T doExecute(Object... args) throws Throwable {
         AbstractConnectionProxy connectionProxy = statementProxy.getConnectionProxy();
         if (connectionProxy.getAutoCommit()) {
+            // 如果连接设置了事务自动提交，则将事务自动提交关闭
             return executeAutoCommitTrue(args);
         } else {
             return executeAutoCommitFalse(args);
@@ -96,11 +97,15 @@ public abstract class AbstractDMLBaseExecutor<T, S extends Statement> extends Ba
         if (!JdbcConstants.MYSQL.equalsIgnoreCase(getDbType()) && isMultiPk()) {
             throw new NotSupportYetException("multi pk only support mysql!");
         }
+        // 根据SQL语句构建before image，目标SQL执行之前的数据镜像：从数据库根据ID主键等信息查询出更新前的数据；
         TableRecords beforeImage = beforeImage();
+        // 真正的去执行SQL语句，但是本地事务还没有提交
         T result = statementCallback.execute(statementProxy.getTargetStatement(), args);
         int updateCount = statementProxy.getUpdateCount();
         if (updateCount > 0) {
+            // 目标SQL执行之后的数据镜像：从数据库根据ID主键等信息查询出更新后的数据；
             TableRecords afterImage = afterImage(beforeImage);
+            // 准备好undo log数据
             prepareUndoLog(beforeImage, afterImage);
         }
         return result;

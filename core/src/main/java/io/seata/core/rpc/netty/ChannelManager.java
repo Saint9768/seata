@@ -144,7 +144,9 @@ public class ChannelManager {
      */
     public static void registerRMChannel(RegisterRMRequest resourceManagerRequest, Channel channel)
         throws IncompatibleVersionException {
+        // 版本号检查
         Version.checkVersion(resourceManagerRequest.getVersion());
+        // resourceID
         Set<String> dbkeySet = dbKeytoSet(resourceManagerRequest.getResourceIds());
         RpcContext rpcContext;
         if (!IDENTIFIED_CHANNELS.containsKey(channel)) {
@@ -164,6 +166,7 @@ public class ChannelManager {
                     .computeIfAbsent(clientIp = ChannelUtil.getClientIpFromChannel(channel), key -> new ConcurrentHashMap<>());
 
             rpcContext.holdInResourceManagerChannels(resourceId, portMap);
+            // 数据保存在内存中
             updateChannelsResource(resourceId, clientIp, resourceManagerRequest.getApplicationId());
         }
     }

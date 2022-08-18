@@ -236,11 +236,13 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
         }
 
         CompressorType compressorType = CompressorType.NONE;
+        // 是否对数据进行压缩
         if (needCompress(undoLogContent)) {
             compressorType = ROLLBACK_INFO_COMPRESS_TYPE;
             undoLogContent = CompressorFactory.getCompressor(compressorType.getCode()).compress(undoLogContent);
         }
 
+        // undo_log持久化
         insertUndoLogWithNormal(xid, branchId, buildContext(parser.getName(), compressorType), undoLogContent, cp.getTargetConnection());
     }
 

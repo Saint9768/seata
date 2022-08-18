@@ -106,6 +106,7 @@ public class DefaultResourceManager implements ResourceManager {
     @Override
     public boolean lockQuery(BranchType branchType, String resourceId,
                              String xid, String lockKeys) throws TransactionException {
+        // 进到DefaultSourceManager
         return getResourceManager(branchType).lockQuery(branchType, resourceId, xid, lockKeys);
     }
 

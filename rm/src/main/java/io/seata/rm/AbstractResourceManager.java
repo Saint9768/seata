@@ -58,12 +58,18 @@ public abstract class AbstractResourceManager implements ResourceManager {
     public Long branchRegister(BranchType branchType, String resourceId, String clientId, String xid, String applicationData, String lockKeys) throws TransactionException {
         try {
             BranchRegisterRequest request = new BranchRegisterRequest();
+            // xid是全局事务ID
             request.setXid(xid);
+            // 分布式事务要更新数据的全局锁keys
             request.setLockKey(lockKeys);
+            // 分支事务对应的资源ID
             request.setResourceId(resourceId);
+            // 分支事务类型
             request.setBranchType(branchType);
+            // 引用的数据
             request.setApplicationData(applicationData);
 
+            // 将请求通过RmNettyRemotingClient发送到seata-server
             BranchRegisterResponse response = (BranchRegisterResponse) RmNettyRemotingClient.getInstance().sendSyncRequest(request);
             if (response.getResultCode() == ResultCode.Failed) {
                 throw new RmTransactionException(response.getTransactionExceptionCode(), String.format("Response[ %s ]", response.getMsg()));

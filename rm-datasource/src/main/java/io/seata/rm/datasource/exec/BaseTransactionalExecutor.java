@@ -117,11 +117,13 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
 
     @Override
     public T execute(Object... args) throws Throwable {
+        // 从全局事务上下文中获取xid
         String xid = RootContext.getXID();
         if (xid != null) {
             statementProxy.getConnectionProxy().bind(xid);
         }
 
+        // RootContext.requireGlobalLock()检查是否需要全局锁
         statementProxy.getConnectionProxy().setGlobalLockRequire(RootContext.requireGlobalLock());
         return doExecute(args);
     }
@@ -322,10 +324,13 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
         ConnectionProxy connectionProxy = statementProxy.getConnectionProxy();
 
         TableRecords lockKeyRecords = sqlRecognizer.getSQLType() == SQLType.DELETE ? beforeImage : afterImage;
+        // 1、构建全局锁key信息，针对更新的一批数据主键ID构建这批数据的全局锁key
+        // 例如：table_name:id_1101
         String lockKeys = buildLockKey(lockKeyRecords);
         if (null != lockKeys) {
             connectionProxy.appendLockKey(lockKeys);
 
+            // 构建undolog
             SQLUndoLog sqlUndoLog = buildUndoItem(beforeImage, afterImage);
             connectionProxy.appendUndoLog(sqlUndoLog);
         }
@@ -343,17 +348,23 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
         }
 
         StringBuilder sb = new StringBuilder();
+        // 获取表名
         sb.append(rowsIncludingPK.getTableMeta().getTableName());
         sb.append(":");
         int filedSequence = 0;
+        // pksRows，更新的每一行数据的主键字段和主键值
         List<Map<String, Field>> pksRows = rowsIncludingPK.pkRows();
+        // 更新的每一行数据的主键字段名称，因为主键可能是联合主键，即主键的名称可能有多个
         List<String> primaryKeysOnlyName = getTableMeta().getPrimaryKeyOnlyName();
+        // 遍历所有的主键字段和主键值，rowMap就是一行数据，key是字段名称，value是字段值
         for (Map<String, Field> rowMap : pksRows) {
             int pkSplitIndex = 0;
+            // 遍历和提取这行数据的多个主键字段的名称
             for (String pkName : primaryKeysOnlyName) {
                 if (pkSplitIndex > 0) {
                     sb.append("_");
                 }
+                // 获取多个主键字段的value，通过_拼接在一起
                 sb.append(rowMap.get(pkName).getValue());
                 pkSplitIndex++;
             }
@@ -362,6 +373,7 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
                 sb.append(",");
             }
         }
+        // keys = table_name:_主键值1_主键值2
         return sb.toString();
     }
 
@@ -373,12 +385,15 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
      * @return sql undo log
      */
     protected SQLUndoLog buildUndoItem(TableRecords beforeImage, TableRecords afterImage) {
+        // SQL执行之前的类型：insert、update、delete
         SQLType sqlType = sqlRecognizer.getSQLType();
+        // 表名
         String tableName = sqlRecognizer.getTableName();
 
         SQLUndoLog sqlUndoLog = new SQLUndoLog();
         sqlUndoLog.setSqlType(sqlType);
         sqlUndoLog.setTableName(tableName);
+        // SQL执行前后的镜像
         sqlUndoLog.setBeforeImage(beforeImage);
         sqlUndoLog.setAfterImage(afterImage);
         return sqlUndoLog;

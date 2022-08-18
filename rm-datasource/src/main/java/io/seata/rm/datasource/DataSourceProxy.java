@@ -48,30 +48,39 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DataSourceProxy.class);
 
+    // 默认资源分组ID
     private static final String DEFAULT_RESOURCE_GROUP_ID = "DEFAULT";
 
+    // 资源组ID，主从架构数据库，主节点和从节点（多个数据源）在一个资源分组
     private String resourceGroupId;
 
+    // 代理的目标数据库连接URL，其也可以作为resourceID
     private String jdbcUrl;
 
+    // 真正的resourceID，数据库
     private String resourceId;
 
+    // 数据库连接的类型
     private String dbType;
 
+    // 数据库连接的用户名
     private String userName;
 
     /**
+     * 是否启用表元数据的检查，默认不启用
      * Enable the table meta checker
      */
     private static boolean ENABLE_TABLE_META_CHECKER_ENABLE = ConfigurationFactory.getInstance().getBoolean(
         ConfigurationKeys.CLIENT_TABLE_META_CHECK_ENABLE, DEFAULT_CLIENT_TABLE_META_CHECK_ENABLE);
 
     /**
+     * 表元数据检查的时间间隔，默认60s
      * Table meta checker interval
      */
     private static final long TABLE_META_CHECKER_INTERVAL = ConfigurationFactory.getInstance().getLong(
             ConfigurationKeys.CLIENT_TABLE_META_CHECKER_INTERVAL, DEFAULT_TABLE_META_CHECKER_INTERVAL);
 
+    // 定时调度线程池，用于对表元数据做检查
     private final ScheduledExecutorService tableMetaExecutor = new ScheduledThreadPoolExecutor(1,
         new NamedThreadFactory("tableMetaChecker", 1, true));
 
@@ -99,20 +108,34 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
         init(targetDataSource, resourceGroupId);
     }
 
+    /**
+     * 数据库连接池代理的初始化
+     *
+     * @param dataSource 要代理的数据源
+     * @param resourceGroupId 数据源分组ID
+     */
     private void init(DataSource dataSource, String resourceGroupId) {
         this.resourceGroupId = resourceGroupId;
+        // 拿到目标数据库的一个数据库连接
         try (Connection connection = dataSource.getConnection()) {
+            // 拿到数据库连接的URL
             jdbcUrl = connection.getMetaData().getURL();
+            // 数据库的类型
             dbType = JdbcUtils.getDbType(jdbcUrl);
+            // Oracle数据库，从数据库连接的元数据中获取用户名
             if (JdbcConstants.ORACLE.equals(dbType)) {
                 userName = connection.getMetaData().getUserName();
             } else if (JdbcConstants.MARIADB.equals(dbType)) {
+                // 如果数据库类型是Maridb，则将dbType赋值为MySQL
                 dbType = JdbcConstants.MYSQL;
             }
         } catch (SQLException e) {
             throw new IllegalStateException("can not init dataSource", e);
         }
+        // 初始化资源ID
         initResourceId();
+
+        // 注册资源：把当前数据库连接池代理，作为一个资源注册到seata-server
         DefaultResourceManager.get().registerResource(this);
         if (ENABLE_TABLE_META_CHECKER_ENABLE) {
             tableMetaExecutor.scheduleAtFixedRate(() -> {
@@ -129,6 +152,7 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
     }
 
     /**
+     * 获取一个正常的数据库连接（不走代理的）
      * Gets plain connection.
      *
      * @return the plain connection
@@ -156,6 +180,7 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
     @Override
     public ConnectionProxy getConnection(String username, String password) throws SQLException {
         Connection targetConnection = targetDataSource.getConnection(username, password);
+        // 获取数据库连接代理
         return new ConnectionProxy(this, targetConnection);
     }
 
@@ -173,12 +198,14 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
     }
 
     private void initResourceId() {
+        // Postergesql
         if (JdbcConstants.POSTGRESQL.equals(dbType)) {
             initPGResourceId();
         } else if (JdbcConstants.ORACLE.equals(dbType) && userName != null) {
             initDefaultResourceId();
             resourceId = resourceId + "/" + userName;
         } else if (JdbcConstants.MYSQL.equals(dbType)) {
+            // 初始化MySQL数据库资源ID
             initMysqlResourceId();
         } else {
             initDefaultResourceId();
@@ -204,6 +231,7 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
      */
     private void initMysqlResourceId() {
         String startsWith = "jdbc:mysql:loadbalance://";
+        // 负载均衡的方式
         if (jdbcUrl.startsWith(startsWith)) {
             String url;
             if (jdbcUrl.contains("?")) {
@@ -216,7 +244,7 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
             initDefaultResourceId();
         }
     }
-    
+
     /**
      * prevent pg sql url like
      * jdbc:postgresql://127.0.0.1:5432/seata?currentSchema=public

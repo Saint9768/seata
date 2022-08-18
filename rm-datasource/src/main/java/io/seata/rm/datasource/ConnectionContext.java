@@ -187,9 +187,11 @@ public class ConnectionContext {
         if (xid == null) {
             throw new IllegalArgumentException("xid should not be null");
         }
+        // 当前事务不在全局事务中
         if (!inGlobalTransaction()) {
             setXid(xid);
         } else {
+            // 当前事务在全局事务中，但是xid不一样，报错
             if (!this.xid.equals(xid)) {
                 throw new ShouldNeverHappenException(String.format("bind xid: %s, while current xid: %s", xid, this.xid));
             }

@@ -115,8 +115,12 @@ public class ConnectionProxy extends AbstractConnectionProxy {
         }
         // Just check lock without requiring lock by now.
         try {
-            boolean lockable = DefaultResourceManager.get().lockQuery(BranchType.AT,
-                getDataSourceProxy().getResourceId(), context.getXid(), lockKeys);
+            // 检查全局锁是否被使用
+            boolean lockable = DefaultResourceManager.get().lockQuery(
+                    BranchType.AT,
+                    getDataSourceProxy().getResourceId(),
+                    context.getXid(),
+                    lockKeys);
             if (!lockable) {
                 throw new LockConflictException(String.format("get lock failed, lockKey: %s",lockKeys));
             }
@@ -148,6 +152,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
         recognizeLockKeyConflictException(te, null);
     }
 
+    // 识别锁key冲突异常
     private void recognizeLockKeyConflictException(TransactionException te, String lockKeys) throws SQLException {
         if (te.getCode() == TransactionExceptionCode.LockKeyConflict
             || te.getCode() == TransactionExceptionCode.LockKeyConflictFailFast) {
@@ -184,6 +189,8 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     @Override
     public void commit() throws SQLException {
         try {
+            // 真正提交事务
+            // lockRetryPolicy其中包含全局锁的概念，支持retry重试策略
             lockRetryPolicy.execute(() -> {
                 doCommit();
                 return null;
@@ -226,16 +233,20 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
 
     private void doCommit() throws SQLException {
+        // 全局事务
         if (context.inGlobalTransaction()) {
             processGlobalTransactionCommit();
         } else if (context.isGlobalLockRequire()) {
+            // 需要获取全局锁
             processLocalCommitWithGlobalLocks();
         } else {
+            // 分支事务 或 正常场景
             targetConnection.commit();
         }
     }
 
     private void processLocalCommitWithGlobalLocks() throws SQLException {
+        // 检查全局锁keys，拼接后的keys以;分隔
         checkLock(context.buildLockKeys());
         try {
             targetConnection.commit();
@@ -249,10 +260,13 @@ public class ConnectionProxy extends AbstractConnectionProxy {
         try {
             register();
         } catch (TransactionException e) {
+            // 全局锁冲突、进行重试
             recognizeLockKeyConflictException(e, context.buildLockKeys());
         }
         try {
+            // 回滚日志管理组件
             UndoLogManagerFactory.getUndoLogManager(this.getDbType()).flushUndoLogs(this);
+            // 本地事务提交
             targetConnection.commit();
         } catch (Throwable ex) {
             LOGGER.error("process connectionProxy commit error: {}", ex.getMessage(), ex);
@@ -269,7 +283,8 @@ public class ConnectionProxy extends AbstractConnectionProxy {
         if (!context.hasUndoLog() || !context.hasLockKey()) {
             return;
         }
-        
+
+        // 分支事务注册：将事务类型AT、资源ID（资源在前面的流程已经注册过了）、事务xid、全局锁keys作为分支事务信息注册到seata server
         Long branchId = DefaultResourceManager.get().branchRegister(BranchType.AT, getDataSourceProxy().getResourceId(),
             null, context.getXid(), context.getApplicationData(), context.buildLockKeys());
         context.setBranchId(branchId);

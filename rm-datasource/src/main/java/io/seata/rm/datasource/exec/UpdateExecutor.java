@@ -66,7 +66,9 @@ public class UpdateExecutor<T, S extends Statement> extends AbstractDMLBaseExecu
     @Override
     protected TableRecords beforeImage() throws SQLException {
         ArrayList<List<Object>> paramAppenderList = new ArrayList<>();
+        // 获取表的元数据
         TableMeta tmeta = getTableMeta();
+        // 根据主键ID拼接出一个SQL语句，去查询数据更新之前的数据镜像
         String selectSQL = buildBeforeImageSQL(tmeta, paramAppenderList);
         return buildTableRecords(tmeta, selectSQL, paramAppenderList);
     }

@@ -55,6 +55,7 @@ public class ATCore extends AbstractCore {
     @Override
     protected void branchSessionLock(GlobalSession globalSession, BranchSession branchSession)
         throws TransactionException {
+        // 获取到应用数据
         String applicationData = branchSession.getApplicationData();
         boolean autoCommit = true;
         boolean skipCheckLock = false;
