@@ -119,6 +119,7 @@ public class DataSourceManager extends AbstractResourceManager {
             throw new ShouldNeverHappenException(String.format("resource: %s not found",resourceId));
         }
         try {
+            // 根据undo_log的日志内容做回滚
             UndoLogManagerFactory.getUndoLogManager(dataSourceProxy.getDbType()).undo(dataSourceProxy, xid, branchId);
         } catch (TransactionException te) {
             StackTraceLogger.info(LOGGER, te,

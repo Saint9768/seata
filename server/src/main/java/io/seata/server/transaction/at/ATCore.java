@@ -55,7 +55,7 @@ public class ATCore extends AbstractCore {
     @Override
     protected void branchSessionLock(GlobalSession globalSession, BranchSession branchSession)
         throws TransactionException {
-        // 获取到应用数据
+        // 获取到应用数据，得到其中的一些属性
         String applicationData = branchSession.getApplicationData();
         boolean autoCommit = true;
         boolean skipCheckLock = false;
@@ -64,6 +64,7 @@ public class ATCore extends AbstractCore {
                 objectMapper = new ObjectMapper();
             }
             try {
+                // ObjectMapper是一个对象映射框架，把applicationdata对象中的属性读取出来放到Map中
                 Map<String, Object> data = objectMapper.readValue(applicationData, HashMap.class);
                 Object clientAutoCommit = data.get(AUTO_COMMIT);
                 if (clientAutoCommit != null && !(boolean)clientAutoCommit) {
@@ -78,6 +79,7 @@ public class ATCore extends AbstractCore {
             }
         }
         try {
+            // 通过分支事务会话做一个全局锁加锁
             if (!branchSession.lock(autoCommit, skipCheckLock)) {
                 throw new BranchTransactionException(LockKeyConflict,
                     String.format("Global lock acquire failed xid = %s branchId = %s", globalSession.getXid(),

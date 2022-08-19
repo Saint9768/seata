@@ -108,33 +108,40 @@ public class LockStoreDataBaseDAO implements LockStore {
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
+        // 已经存在的行锁key集合
         Set<String> dbExistedRowKeys = new HashSet<>();
         boolean originalAutoCommit = true;
         if (lockDOs.size() > 1) {
             lockDOs = lockDOs.stream().filter(LambdaUtils.distinctByKey(LockDO::getRowKey)).collect(Collectors.toList());
         }
         try {
+            // 从全局锁数据源里获取到一个连接
             conn = lockStoreDataSource.getConnection();
+            // 把自动提交事务关闭
             if (originalAutoCommit = conn.getAutoCommit()) {
                 conn.setAutoCommit(false);
             }
             List<LockDO> unrepeatedLockDOs = lockDOs;
 
             //check lock
+            // 是否跳过锁检查
             if (!skipCheckLock) {
 
                 boolean canLock = true;
-                //query
+                //query，针对全局锁表查询某个数据
                 String checkLockSQL = LockStoreSqlFactory.getLogStoreSql(dbType).getCheckLockableSql(lockTable, lockDOs.size());
                 ps = conn.prepareStatement(checkLockSQL);
                 for (int i = 0; i < lockDOs.size(); i++) {
                     ps.setString(i + 1, lockDOs.get(i).getRowKey());
                 }
                 rs = ps.executeQuery();
+                // 获取到当前要加全局锁的事务xid
                 String currentXID = lockDOs.get(0).getXid();
                 boolean failFast = false;
+                // 查询结果为空时，说明没有事务加全局锁
                 while (rs.next()) {
                     String dbXID = rs.getString(ServerTableColumnsName.LOCK_TABLE_XID);
+                    // 如果加全局锁的是其他的全局事务xid
                     if (!StringUtils.equals(dbXID, currentXID)) {
                         if (LOGGER.isInfoEnabled()) {
                             String dbPk = rs.getString(ServerTableColumnsName.LOCK_TABLE_PK);
@@ -154,6 +161,8 @@ public class LockStoreDataBaseDAO implements LockStore {
 
                     dbExistedRowKeys.add(rs.getString(ServerTableColumnsName.LOCK_TABLE_ROW_KEY));
                 }
+
+                // 不可以加全局锁，全局锁已经被其他事务占用
                 if (!canLock) {
                     conn.rollback();
                     if (failFast) {
@@ -175,6 +184,7 @@ public class LockStoreDataBaseDAO implements LockStore {
             // lock
             if (unrepeatedLockDOs.size() == 1) {
                 LockDO lockDO = unrepeatedLockDOs.get(0);
+                // 加全局锁
                 if (!doAcquireLock(conn, lockDO)) {
                     if (LOGGER.isInfoEnabled()) {
                         LOGGER.info("Global lock acquire failed, xid {} branchId {} pk {}", lockDO.getXid(), lockDO.getBranchId(), lockDO.getPk());
@@ -183,6 +193,7 @@ public class LockStoreDataBaseDAO implements LockStore {
                     return false;
                 }
             } else {
+                // 批量加全局锁
                 if (!doAcquireLocks(conn, unrepeatedLockDOs)) {
                     if (LOGGER.isInfoEnabled()) {
                         LOGGER.info("Global lock batch acquire failed, xid {} branchId {} pks {}", unrepeatedLockDOs.get(0).getXid(),
@@ -325,13 +336,18 @@ public class LockStoreDataBaseDAO implements LockStore {
             //insert
             String insertLockSQL = LockStoreSqlFactory.getLogStoreSql(dbType).getInsertLockSQL(lockTable);
             ps = conn.prepareStatement(insertLockSQL);
+            // 全局事务xid
             ps.setString(1, lockDO.getXid());
             ps.setLong(2, lockDO.getTransactionId());
+            // 分支事务ID
             ps.setLong(3, lockDO.getBranchId());
             ps.setString(4, lockDO.getResourceId());
             ps.setString(5, lockDO.getTableName());
+            // 主键
             ps.setString(6, lockDO.getPk());
+            // rowKey
             ps.setString(7, lockDO.getRowKey());
+            // 锁状态：Locked（已加锁）
             ps.setInt(8, LockStatus.Locked.getCode());
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {

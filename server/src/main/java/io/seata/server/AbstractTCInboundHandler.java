@@ -93,6 +93,7 @@ public abstract class AbstractTCInboundHandler extends AbstractExceptionHandler 
             public void execute(GlobalCommitRequest request, GlobalCommitResponse response)
                 throws TransactionException {
                 try {
+                    // 全局事务提交
                     doGlobalCommit(request, response, rpcContext);
                 } catch (StoreException e) {
                     throw new TransactionException(TransactionExceptionCode.FailedStore,

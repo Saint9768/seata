@@ -195,6 +195,7 @@ public class DefaultCore implements Core {
         if (globalSession.isSaga()) {
             success = getCore(BranchType.SAGA).doGlobalCommit(globalSession, retrying);
         } else {
+            // 获取到全局事务所有的分支事务
             Boolean result = SessionHelper.forEach(globalSession.getSortedBranches(), branchSession -> {
                 // if not retrying, skip the canBeCommittedAsync branches
                 if (!retrying && branchSession.canBeCommittedAsync()) {
@@ -207,6 +208,7 @@ public class DefaultCore implements Core {
                     return CONTINUE;
                 }
                 try {
+                    // 分支事务的提交
                     BranchStatus branchStatus = getCore(branchSession.getBranchType()).branchCommit(globalSession, branchSession);
                     if (isXaerNotaTimeout(globalSession,branchStatus)) {
                         LOGGER.info("Commit branch XAER_NOTA retry timeout, xid = {} branchId = {}", globalSession.getXid(), branchSession.getBranchId());
@@ -304,6 +306,7 @@ public class DefaultCore implements Core {
         if (globalSession.isSaga()) {
             success = getCore(BranchType.SAGA).doGlobalRollback(globalSession, retrying);
         } else {
+            // 遍历所有的分支事务，对分支事务进行回滚
             Boolean result = SessionHelper.forEach(globalSession.getReverseSortedBranches(), branchSession -> {
                 BranchStatus currentBranchStatus = branchSession.getStatus();
                 if (currentBranchStatus == BranchStatus.PhaseOne_Failed) {
@@ -311,6 +314,7 @@ public class DefaultCore implements Core {
                     return CONTINUE;
                 }
                 try {
+                    // 分支事务回滚
                     BranchStatus branchStatus = branchRollback(globalSession, branchSession);
                     if (isXaerNotaTimeout(globalSession, branchStatus)) {
                         LOGGER.info("Rollback branch XAER_NOTA retry timeout, xid = {} branchId = {}", globalSession.getXid(), branchSession.getBranchId());

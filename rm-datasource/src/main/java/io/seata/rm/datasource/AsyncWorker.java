@@ -75,10 +75,12 @@ public class AsyncWorker {
 
         ThreadFactory threadFactory = new NamedThreadFactory("AsyncWorker", 2, true);
         scheduledExecutor = new ScheduledThreadPoolExecutor(2, threadFactory);
+        // 起一个定时任务，每秒从commitQueue中获取两阶段上下文 对分支事务进行提交
         scheduledExecutor.scheduleAtFixedRate(this::doBranchCommitSafely, 10, 1000, TimeUnit.MILLISECONDS);
     }
 
     public BranchStatus branchCommit(String xid, long branchId, String resourceId) {
+        // 两阶段上下文
         Phase2Context context = new Phase2Context(xid, branchId, resourceId);
         addToCommitQueue(context);
         return BranchStatus.PhaseTwo_Committed;
@@ -89,6 +91,7 @@ public class AsyncWorker {
      * then doBranchCommit urgently(so that the queue could be empty again) and retry this process.
      */
     private void addToCommitQueue(Phase2Context context) {
+        // 将二阶段上下文添加到一个BlockingQueue中；
         if (commitQueue.offer(context)) {
             return;
         }
@@ -117,9 +120,11 @@ public class AsyncWorker {
 
         // transfer all context currently received to this list
         List<Phase2Context> allContexts = new LinkedList<>();
+        // 清空commitQueue中的数据，将数据全部放到allContexts中。
         commitQueue.drainTo(allContexts);
 
         // group context by their resourceId
+        // 将所有的二阶段上下文（分支事务提交请求）按resource分组
         Map<String, List<Phase2Context>> groupedContexts = groupedByResourceId(allContexts);
 
         groupedContexts.forEach(this::dealWithGroupedContexts);
@@ -145,6 +150,7 @@ public class AsyncWorker {
             return;
         }
         DataSourceProxy dataSourceProxy = dataSourceManager.get(resourceId);
+        // 如果没有获取到数据库资源，则将分支事务提交请求再次添加会commitQueue中
         if (dataSourceProxy == null) {
             LOGGER.warn("failed to find resource for {} and requeue", resourceId);
             addAllToCommitQueue(contexts);
@@ -153,11 +159,13 @@ public class AsyncWorker {
 
         Connection conn = null;
         try {
+            // 获取一个不走seata代理的数据库连接
             conn = dataSourceProxy.getPlainConnection();
             UndoLogManager undoLogManager = UndoLogManagerFactory.getUndoLogManager(dataSourceProxy.getDbType());
 
             // split contexts into several lists, with each list contain no more element than limit size
             List<List<Phase2Context>> splitByLimit = Lists.partition(contexts, UNDOLOG_DELETE_LIMIT_SIZE);
+            // 使用JDBC删除各个分支事务所在数据库中undo_log表中的数据；
             for (List<Phase2Context> partition : splitByLimit) {
                 deleteUndoLog(conn, undoLogManager, partition);
             }

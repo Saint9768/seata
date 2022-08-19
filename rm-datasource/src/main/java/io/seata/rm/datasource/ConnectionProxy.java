@@ -369,12 +369,14 @@ public class ConnectionProxy extends AbstractConnectionProxy {
                 try {
                     return callable.call();
                 } catch (LockConflictException lockConflict) {
+                    // 锁冲突异常重试
                     onException(lockConflict);
                     // AbstractDMLBaseExecutor#executeAutoCommitTrue the local lock is released
                     if (connection.getContext().isAutoCommitChanged()
                         && lockConflict.getCode() == TransactionExceptionCode.LockKeyConflictFailFast) {
                         lockConflict.setCode(TransactionExceptionCode.LockKeyConflict);
                     }
+                    // 线程睡眠10ms，然后再重试
                     lockRetryController.sleep(lockConflict);
                 } catch (Exception e) {
                     onException(e);

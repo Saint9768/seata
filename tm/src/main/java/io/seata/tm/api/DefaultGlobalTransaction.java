@@ -130,6 +130,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             while (retry > 0) {
                 try {
                     retry--;
+                    // 全局事务提交，走进DefaultTransactionManager
                     status = transactionManager.commit(xid);
                     break;
                 } catch (Throwable ex) {
@@ -166,6 +167,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             while (retry > 0) {
                 try {
                     retry--;
+                    // 事务回滚
                     status = transactionManager.rollback(xid);
                     break;
                 } catch (Throwable ex) {

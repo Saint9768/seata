@@ -51,6 +51,7 @@ public abstract class AbstractRMHandler extends AbstractExceptionHandler
             @Override
             public void execute(BranchCommitRequest request, BranchCommitResponse response)
                 throws TransactionException {
+                // 分支事务提交
                 doBranchCommit(request, response);
             }
         }, request, response);
@@ -95,6 +96,7 @@ public abstract class AbstractRMHandler extends AbstractExceptionHandler
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("Branch committing: " + xid + " " + branchId + " " + resourceId + " " + applicationData);
         }
+        // 分支事务提交
         BranchStatus status = getResourceManager().branchCommit(request.getBranchType(), xid, branchId, resourceId,
             applicationData);
         response.setXid(xid);

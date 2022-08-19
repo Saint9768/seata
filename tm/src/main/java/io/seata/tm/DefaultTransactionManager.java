@@ -64,6 +64,7 @@ public class DefaultTransactionManager implements TransactionManager {
     public GlobalStatus commit(String xid) throws TransactionException {
         GlobalCommitRequest globalCommit = new GlobalCommitRequest();
         globalCommit.setXid(xid);
+        // 将全局事务提交请求发送给seata-server
         GlobalCommitResponse response = (GlobalCommitResponse) syncCall(globalCommit);
         return response.getGlobalStatus();
     }
@@ -72,6 +73,7 @@ public class DefaultTransactionManager implements TransactionManager {
     public GlobalStatus rollback(String xid) throws TransactionException {
         GlobalRollbackRequest globalRollback = new GlobalRollbackRequest();
         globalRollback.setXid(xid);
+        // 发送全局事务回滚请求到seata-server
         GlobalRollbackResponse response = (GlobalRollbackResponse) syncCall(globalRollback);
         return response.getGlobalStatus();
     }

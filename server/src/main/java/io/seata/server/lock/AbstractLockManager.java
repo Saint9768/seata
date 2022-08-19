@@ -51,17 +51,20 @@ public abstract class AbstractLockManager implements LockManager {
         if (branchSession == null) {
             throw new IllegalArgumentException("branchSession can't be null for memory/file locker.");
         }
+        // 从分支事务会话中拿到锁的key
         String lockKey = branchSession.getLockKey();
         if (StringUtils.isNullOrEmpty(lockKey)) {
             // no lock
             return true;
         }
         // get locks of branch
+        // 获取到分支事务里的所有行锁
         List<RowLock> locks = collectRowLocks(branchSession);
         if (CollectionUtils.isEmpty(locks)) {
             // no lock
             return true;
         }
+        // 获取锁
         return getLocker(branchSession).acquireLock(locks, autoCommit, skipCheckLock);
     }
 

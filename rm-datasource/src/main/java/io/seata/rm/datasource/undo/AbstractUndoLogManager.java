@@ -292,6 +292,7 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                     }
 
                     String contextString = rs.getString(ClientTableColumnsName.UNDO_LOG_CONTEXT);
+                    // 解析回滚日志内容
                     Map<String, String> context = parseContext(contextString);
                     byte[] rollbackInfo = getRollbackInfo(rs);
 

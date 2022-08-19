@@ -24,20 +24,28 @@ import io.seata.common.util.StringUtils;
  */
 public class RowLock {
 
+    // 全局事务xid
     private String xid;
 
+    // 全局事务ID
     private Long transactionId;
 
+    // 分支事务ID
     private Long branchId;
 
+    // 资源ID
     private String resourceId;
 
+    // 表名称
     private String tableName;
 
+    // 主键
     private String pk;
 
+    // 行键
     private String rowKey;
 
+    // 特性
     private String feature;
 
     /**
