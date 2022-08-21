@@ -21,15 +21,8 @@ seata:
   config:
     # support: nacos 、 consul 、 apollo 、 zk  、 etcd3
     type: file
-    nacos:
-      server-addr: 127.0.0.1:8848
-      group: SEATA_GROUP
   registry:
-    type: nacos
-    nacos:
-      application: seata-server
-      server-addr: 127.0.0.1:8848
-      group: SEATA_GROUP
+    type: file
   security:
     secretKey: SeataSecretKey0c382ef121d778043159209298fd40bf3850a017
     tokenValidityInMilliseconds: 1800000
