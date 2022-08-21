@@ -23,9 +23,9 @@ transport.serialization=seata
 transport.compressor=none
 
 #Transaction routing rules configuration, only for the client
-service.vgroupMapping.default_tx_group=default
+service.vgroupMapping.saint-trade-tx-group=seata-server-sh
 #If you use a registry, you can ignore it
-service.default.grouplist=127.0.0.1:8091
+service.seata-server-sh.grouplist=127.0.0.1:8091
 service.enableDegrade=false
 service.disableGlobalTransaction=false
 
@@ -66,9 +66,9 @@ tcc.fence.cleanPeriod=1h
 log.exceptionRate=100
 
 #Transaction storage configuration, only for the server. The file, DB, and redis configuration values are optional.
-store.mode=file
-store.lock.mode=file
-store.session.mode=file
+store.mode=db
+store.lock.mode=db
+store.session.mode=db
 #Used for password encryption
 store.publicKey=
 
@@ -83,10 +83,10 @@ store.file.sessionReloadReadSize=100
 #These configurations are required if the `store mode` is `db`. If `store.mode,store.lock.mode,store.session.mode` are not equal to `db`, you can remove the configuration block.
 store.db.datasource=druid
 store.db.dbType=mysql
-store.db.driverClassName=com.mysql.jdbc.Driver
-store.db.url=jdbc:mysql://127.0.0.1:3306/seata?useUnicode=true&rewriteBatchedStatements=true
-store.db.user=username
-store.db.password=password
+store.db.driverClassName=com.mysql.cj.jdbc.Driver
+store.db.url=jdbc:mysql://127.0.0.1:3306/seata_server?useUnicode=true
+store.db.user=root
+store.db.password=123456
 store.db.minConn=5
 store.db.maxConn=30
 store.db.globalTable=global_table

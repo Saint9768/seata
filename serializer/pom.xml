@@ -30,11 +30,11 @@
 
     <modules>
         <module>seata-serializer-all</module>
-        <module>seata-serializer-protobuf</module>
+<!--        <module>seata-serializer-protobuf</module>-->
         <module>seata-serializer-seata</module>
-        <module>seata-serializer-kryo</module>
-        <module>seata-serializer-hessian</module>
-        <module>seata-serializer-fst</module>
+<!--        <module>seata-serializer-kryo</module>-->
+<!--        <module>seata-serializer-hessian</module>-->
+<!--        <module>seata-serializer-fst</module>-->
     </modules>
 
 </project>
