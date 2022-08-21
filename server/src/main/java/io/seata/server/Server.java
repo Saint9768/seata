@@ -58,7 +58,7 @@ public class Server {
         ParameterParser parameterParser = new ParameterParser(args);
 
         //initialize the metrics
-        // seata server支持metric指标采集（一带而过即可）
+        // seata server支持metric指标采集（流程上无需重点关注）
         MetricsManager.get().init();
 
         System.setProperty(ConfigurationKeys.STORE_MODE, parameterParser.getStoreMode());
