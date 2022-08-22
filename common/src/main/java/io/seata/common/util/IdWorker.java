@@ -92,7 +92,7 @@ public class IdWorker {
     private void initTimestampAndSequence() {
         // 拿到当前时间戳 - （2020-05-03 时间戳）的数值，即当前时间相对2020-05-03的时间戳
         long timestamp = getNewestTimestamp();
-        // 把时间戳左移12位，
+        // 把时间戳左移12位，后12位流程sequence使用
         long timestampWithSequence = timestamp << sequenceBits;
         // 把混合sequence的时间戳赋值给timestampAndSequence
         this.timestampAndSequence = new AtomicLong(timestampWithSequence);

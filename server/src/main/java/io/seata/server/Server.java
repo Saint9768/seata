@@ -55,12 +55,13 @@ public class Server {
         //initialize the parameter parser
         //Note that the parameter parser should always be the first line to execute.
         //Because, here we need to parse the parameters needed for startup.
+        // 1. 对配置文件做参数解析：包括registry.conf、file.conf的解析
         ParameterParser parameterParser = new ParameterParser(args);
 
-        //initialize the metrics
-        // seata server支持metric指标采集（流程上无需重点关注）
+        // 2、初始化监控，做metric指标采集
         MetricsManager.get().init();
 
+        // 将Store资源持久化方式放到系统的环境变量store.mode中
         System.setProperty(ConfigurationKeys.STORE_MODE, parameterParser.getStoreMode());
 
         // seata server里netty server 的io线程池（核心线程数50，最大线程数100）
@@ -71,21 +72,27 @@ public class Server {
                 new LinkedBlockingQueue<>(NettyServerConfig.getMaxTaskQueueSize()),
                 new NamedThreadFactory("ServerHandlerThread", NettyServerConfig.getMaxServerPoolSize()), new ThreadPoolExecutor.CallerRunsPolicy());
 
-        // 创建netty网络通信的服务器
+        // 3、创建TC与RM/TM通信的RPC服务器--netty
         NettyRemotingServer nettyRemotingServer = new NettyRemotingServer(workingThreads);
 
-        // 初始化UUID生成器（雪花算法）
+        // 4、初始化UUID生成器（雪花算法）
         UUIDGenerator.init(parameterParser.getServerNode());
+
         //log store mode : file, db, redis
+        // 5、设置事务会话、全局锁的持久化方式，有三种类型可选：file/db/redis
         SessionHolder.init(parameterParser.getSessionStoreMode());
         LockerManagerFactory.init(parameterParser.getLockStoreMode());
 
-        // 默认协调者，后台启动的一堆线程
+        // 6、创建并初始化事务协调器，后台启动一堆线程做定时任务，
         DefaultCoordinator coordinator = DefaultCoordinator.getInstance(nettyRemotingServer);
         coordinator.init();
+
+        // 将DefaultCoordinator作为Netty Server的transactionMessageHandler；
+        // 用于做AT、TCC、SAGA等不同事务类型的逻辑处理
         nettyRemotingServer.setHandler(coordinator);
 
         // let ServerRunner do destroy instead ShutdownHook, see https://github.com/seata/seata/issues/4028
+        // 7、注册ServerRunner销毁（Spring容器销毁）的回调钩子函数
         ServerRunner.addDisposable(coordinator);
 
         //127.0.0.1 and 0.0.0.0 are not valid here.
@@ -99,6 +106,7 @@ public class Server {
                 XID.setIpAddress(NetUtil.getLocalIp());
             }
         }
+        // 8、启动netty Server，用于接收TM/RM的请求
         nettyRemotingServer.init();
     }
 }

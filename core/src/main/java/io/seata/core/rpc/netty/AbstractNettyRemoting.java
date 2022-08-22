@@ -281,6 +281,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
             // 根据消息的类型获取到请求处理组件和请求处理线程池组成的Pair
             final Pair<RemotingProcessor, ExecutorService> pair = this.processorTable.get((int) messageTypeAware.getTypeCode());
             if (pair != null) {
+                // 如果消息对应的处理器设置了线程池，则放到线程池中执行
                 if (pair.getSecond() != null) {
                     try {
                         pair.getSecond().execute(() -> {
@@ -293,6 +294,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
                             }
                         });
                     } catch (RejectedExecutionException e) {
+                        // 线程池拒绝策略之一，抛出异常：RejectedExecutionException
                         LOGGER.error(FrameworkErrorCode.ThreadPoolFull.getErrCode(),
                             "thread pool is full, current max pool size is " + messageExecutor.getActiveCount());
                         if (allowDumpStack) {
@@ -310,6 +312,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
                         }
                     }
                 } else {
+                    // 对应的处理器没有设置线程池，则直接执行；如果某条消息处理特别慢，会严重影响并发；
                     try {
                         pair.getFirst().process(ctx, rpcMessage);
                     } catch (Throwable th) {

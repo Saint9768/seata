@@ -82,11 +82,15 @@ public class SessionHolder {
      */
     private static long DISTRIBUTED_LOCK_EXPIRE_TIME = CONFIG.getLong(ConfigurationKeys.DISTRIBUTED_LOCK_EXPIRE_TIME, 10000);
 
+    // 用于管理所有的Setssion，以及Session的创建、更新、删除等
     private static SessionManager ROOT_SESSION_MANAGER;
+    // 用于管理所有的异步commit的Session，包括创建、更新以及删除
     private static SessionManager ASYNC_COMMITTING_SESSION_MANAGER;
+    // 用于管理所有的重试commit的Session，包括创建、更新以及删除
     private static SessionManager RETRY_COMMITTING_SESSION_MANAGER;
+    // 用于管理所有的重试rollback的Session，包括创建、更新以及删除
     private static SessionManager RETRY_ROLLBACKING_SESSION_MANAGER;
-
+    // 用于管理分布式锁
     private static DistributedLocker DISTRIBUTED_LOCKER;
 
     /**
@@ -101,6 +105,8 @@ public class SessionHolder {
                     CONFIG.getConfig(ConfigurationKeys.STORE_MODE, SERVER_DEFAULT_STORE_MODE));
         }
         StoreMode storeMode = StoreMode.get(mode);
+        // 根据storeMode采用SPI机制初始化SessionManager
+        // db模式
         if (StoreMode.DB.equals(storeMode)) {
             ROOT_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.DB.getName());
             ASYNC_COMMITTING_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.DB.getName(),
@@ -112,6 +118,7 @@ public class SessionHolder {
 
             DISTRIBUTED_LOCKER = DistributedLockerFactory.getDistributedLocker(StoreMode.DB.getName());
         } else if (StoreMode.FILE.equals(storeMode)) {
+            // 文件模式
             String sessionStorePath = CONFIG.getConfig(ConfigurationKeys.STORE_FILE_DIR,
                     DEFAULT_SESSION_STORE_FILE_DIR);
             if (StringUtils.isBlank(sessionStorePath)) {
@@ -125,6 +132,7 @@ public class SessionHolder {
 
             DISTRIBUTED_LOCKER = DistributedLockerFactory.getDistributedLocker(StoreMode.FILE.getName());
         } else if (StoreMode.REDIS.equals(storeMode)) {
+            // redis模式
             ROOT_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class, StoreMode.REDIS.getName());
             ASYNC_COMMITTING_SESSION_MANAGER = EnhancedServiceLoader.load(SessionManager.class,
                 StoreMode.REDIS.getName(), new Object[]{ASYNC_COMMITTING_SESSION_MANAGER_NAME});

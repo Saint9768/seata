@@ -69,11 +69,15 @@ public class ParameterParser {
 
     private void init(String[] args) {
         try {
+            // 解析运行期参数，默认什么里面什么都没有
             getCommandParameters(args);
+            // server端在容器中启动，则从容器环境中读取环境、host、port、server节点以及StoreMode存储模式
             getEnvParameters();
+            // 设置seata的环境
             if (StringUtils.isNotBlank(seataEnv)) {
                 System.setProperty(ENV_PROPERTY_KEY, seataEnv);
             }
+            // 如果没有从运行期参数、容器中获取到storeMode，则从配置文件中获取存储模式
             if (StringUtils.isBlank(storeMode)) {
                 storeMode = CONFIG.getConfig(ConfigurationKeys.STORE_MODE, SERVER_DEFAULT_STORE_MODE);
             }
@@ -100,12 +104,15 @@ public class ParameterParser {
     }
 
     private void getEnvParameters() {
+        // 设置seata的环境
         if (StringUtils.isBlank(seataEnv)) {
             seataEnv = ContainerHelper.getEnv();
         }
+        // 设置Host
         if (StringUtils.isBlank(host)) {
             host = ContainerHelper.getHost();
         }
+        // 设置端口号
         if (port == 0) {
             port = ContainerHelper.getPort();
         }

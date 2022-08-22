@@ -183,7 +183,9 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
         if (remotingServer == null) {
             throw new IllegalArgumentException("RemotingServer not allowed be null.");
         }
+        // 绑定远程通信的Server
         this.remotingServer = remotingServer;
+        // DefaultCore封装了AT、TCC、Saga、XA分布式事务模式的具体实现类
         this.core = new DefaultCore(remotingServer);
     }
 
@@ -354,37 +356,46 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
     protected void handleRetryRollbacking() {
         SessionCondition sessionCondition = new SessionCondition(rollbackingStatuses);
         sessionCondition.setLazyLoadBranch(true);
+        // 获取所有的可回滚的全局事务session
         Collection<GlobalSession> rollbackingSessions =
             SessionHolder.getRetryRollbackingSessionManager().findGlobalSessions(sessionCondition);
+        // 如果可回滚的分支事务为空，则直接返回
         if (CollectionUtils.isEmpty(rollbackingSessions)) {
             return;
         }
         long now = System.currentTimeMillis();
+        // 遍历所有的可回滚Session，
         SessionHelper.forEach(rollbackingSessions, rollbackingSession -> {
             try {
                 // prevent repeated rollback
+                // 防止重复回滚：如果session的状态是正在回滚中并且session不是死亡的，则直接返回。
                 if (rollbackingSession.getStatus().equals(GlobalStatus.Rollbacking)
                     && !rollbackingSession.isDeadSession()) {
                     // The function of this 'return' is 'continue'.
                     return;
                 }
+                // 判断回滚是否重试超时
                 if (isRetryTimeout(now, MAX_ROLLBACK_RETRY_TIMEOUT.toMillis(), rollbackingSession.getBeginTime())) {
                     if (ROLLBACK_RETRY_TIMEOUT_UNLOCK_ENABLE) {
                         rollbackingSession.clean();
                     }
                     // Prevent thread safety issues
+                    // 删除已经超时的回滚Session
                     SessionHolder.getRetryRollbackingSessionManager().removeGlobalSession(rollbackingSession);
                     LOGGER.error("Global transaction rollback retry timeout and has removed [{}]", rollbackingSession.getXid());
 
                     SessionHelper.endRollbackFailed(rollbackingSession, true);
 
                     // rollback retry timeout event
+                    // 发布session回滚完成事件给到Metric
                     MetricsPublisher.postSessionDoneEvent(rollbackingSession, GlobalStatus.RollbackRetryTimeout, true, false);
 
                     //The function of this 'return' is 'continue'.
                     return;
                 }
+                // 对回滚中的Session添加Session生命周期的监听
                 rollbackingSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
+                // 使用DefaultCoordinator组合的DefaultCore执行全局回滚
                 core.doGlobalRollback(rollbackingSession, true);
             } catch (TransactionException ex) {
                 LOGGER.info("Failed to retry rollbacking [{}] {} {}", rollbackingSession.getXid(), ex.getCode(), ex.getMessage());
@@ -485,22 +496,27 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
      * Init.
      */
     public void init() {
+        // 处理重试回滚
         retryRollbacking.scheduleAtFixedRate(
             () -> SessionHolder.distributedLockAndExecute(RETRY_ROLLBACKING, this::handleRetryRollbacking), 0,
             ROLLBACKING_RETRY_PERIOD, TimeUnit.MILLISECONDS);
 
+        // 处理重试提交
         retryCommitting.scheduleAtFixedRate(
             () -> SessionHolder.distributedLockAndExecute(RETRY_COMMITTING, this::handleRetryCommitting), 0,
             COMMITTING_RETRY_PERIOD, TimeUnit.MILLISECONDS);
 
+        // 处理异步提交
         asyncCommitting.scheduleAtFixedRate(
             () -> SessionHolder.distributedLockAndExecute(ASYNC_COMMITTING, this::handleAsyncCommitting), 0,
             ASYNC_COMMITTING_RETRY_PERIOD, TimeUnit.MILLISECONDS);
 
+        // 做超时检查
         timeoutCheck.scheduleAtFixedRate(
             () -> SessionHolder.distributedLockAndExecute(TX_TIMEOUT_CHECK, this::timeoutCheck), 0,
             TIMEOUT_RETRY_PERIOD, TimeUnit.MILLISECONDS);
 
+        // undo_log日志的删除
         undoLogDelete.scheduleAtFixedRate(
             () -> SessionHolder.distributedLockAndExecute(UNDOLOG_DELETE, this::undoLogDelete),
             UNDO_LOG_DELAY_DELETE_PERIOD, UNDO_LOG_DELETE_PERIOD, TimeUnit.MILLISECONDS);
