@@ -72,11 +72,11 @@ import static io.seata.common.DefaultValues.DEFAULT_TX_GROUP_OLD;
  * The type Global transaction scanner.
  * 伴随着Spring容器初始化完毕，会调用这个Bean的初始化逻辑，进而初始化seata client
  * <p>
- * AbstractAutoProxyCreator -- Spring框架内动态代理创建组件
- * ConfigurationChangeListener：关注配置变更事件监听器
- * InitializingBean：Bean初始化回调
+ * AbstractAutoProxyCreator： Spring框架内动态代理创建组件
+ * ConfigurationChangeListener： 关注配置变更事件监听器
+ * InitializingBean： Bean初始化回调
  * ApplicationContextAware： 感知到SPring容器
- * DisposableBean：支持可抛弃Bean
+ * DisposableBean： 支持可抛弃Bean
  *
  * @author slievrly
  */

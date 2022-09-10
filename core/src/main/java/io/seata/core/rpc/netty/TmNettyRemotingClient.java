@@ -75,7 +75,7 @@ public final class TmNettyRemotingClient extends AbstractNettyRemotingClient {
                                   EventExecutorGroup eventExecutorGroup,
                                   ThreadPoolExecutor messageExecutor) {
         super(nettyClientConfig, eventExecutorGroup, messageExecutor, NettyPoolKey.TransactionRole.TMROLE);
-        // 安全认证数组签名signer组件
+        // 安全认证鉴权签名signer组件
         this.signer = EnhancedServiceLoader.load(AuthSigner.class);
         // set enableClientBatchSendRequest
         this.enableClientBatchSendRequest = ConfigurationFactory.getInstance().getBoolean(ConfigurationKeys.ENABLE_TM_CLIENT_BATCH_SEND_REQUEST,

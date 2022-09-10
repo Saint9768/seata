@@ -138,9 +138,13 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
     public AbstractNettyRemotingClient(NettyClientConfig nettyClientConfig, EventExecutorGroup eventExecutorGroup,
                                        ThreadPoolExecutor messageExecutor, NettyPoolKey.TransactionRole transactionRole) {
         super(messageExecutor);
+        // 用于表示当前Client的角色：TM、RM、Server
         this.transactionRole = transactionRole;
+        // 实例化NettyClientBootstrap，其中组成了原生netty的Bootstrap、EventLoopGroup、EventExecutorGroup
         clientBootstrap = new NettyClientBootstrap(nettyClientConfig, eventExecutorGroup, transactionRole);
+        // 给Bootstrap设置消息处理器Handler（ChannelOutboundHandler）
         clientBootstrap.setChannelHandlers(new ClientHandler());
+        // 实例化netty的channel管理器，用于管理channel连接
         clientChannelManager = new NettyClientChannelManager(
             new NettyPoolableFactory(this, clientBootstrap), getPoolKeyFunction(), nettyClientConfig);
     }

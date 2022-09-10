@@ -103,7 +103,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             throw new IllegalStateException("Global transaction already exists," +
                 " can't begin a new global transaction, currentXid = " + currentXid);
         }
-        // 通过全局事务管理组件去真正开启一个全局事务（想seata-server发送请求）；
+        // 通过全局事务管理组件去真正开启一个全局事务（向seata-server发送请求）；
         // 开启成功之后会获取到一个xid
         xid = transactionManager.begin(null, null, name, timeout);
         status = GlobalStatus.Begin;
