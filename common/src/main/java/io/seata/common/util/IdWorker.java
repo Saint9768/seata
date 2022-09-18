@@ -77,6 +77,7 @@ public class IdWorker {
 
     /**
      * instantiate an IdWorker using given workerId
+     *
      * @param workerId if null, then will auto assign one
      */
     public IdWorker(Long workerId) {
@@ -100,6 +101,7 @@ public class IdWorker {
 
     /**
      * init workerId
+     *
      * @param workerId if null, then auto generate one
      */
     private void initWorkerId(Long workerId) {
@@ -112,6 +114,7 @@ public class IdWorker {
             String message = String.format("worker Id can't be greater than %d or less than 0", maxWorkerId);
             throw new IllegalArgumentException(message);
         }
+        // workId左移53位
         this.workerId = workerId << (timestampBits + sequenceBits);
     }
 
@@ -123,14 +126,18 @@ public class IdWorker {
      * next   10 bit: workerId  10个bit表示机器号
      * next   41 bit: timestamp 41个bit表示当前机器的时间戳（ms级别），每毫秒递增
      * lowest 12 bit: sequence 12位的序号，如果一台机器在一毫秒内有很多线程要来生成id，12bit的sequence会自增
+     *
+     * 时钟回拨问题解决:
+     *     1、通过借用未来时间来解决sequence天然存在的并发限制，如果`timestampAndSequence`中的当前时间戳大约 服务器的当前时间，仅仅会睡眠5ms，起一个缓冲的作用；
+     *     但`timestampAndSequence`仍会继续递增，使用未来的时间。
+     *     2、Seata Server服务不重启基本没有问题，当接入Seata Server的服务们QPS比较高时，重启Seata Server就可能会出现新生成的UUID和历史UUID重复问题。
+     *
      * @return UUID
      */
     public long nextId() {
         // 解决sequence序列号被用尽问题
         waitIfNecessary();
-        // 自增的时间戳的sequence，等于对一个毫秒内的sequence做累加操作
-        //    1.如果大量的线程并发获取UUID，可能导致一个毫秒内的sequence耗尽，进而导致时间戳也累加了，不过当前实际时间实际还是在那一毫秒
-        //    2.而AtomicLong类型已经加到了下一个/几个毫秒，尽可能的保证了QPS过大后的UUID生成算法稳定性
+        // 自增时间戳的sequence，等于对一个毫秒内的sequence做累加操作，或 timestamp + 1、sequence置0
         long next = timestampAndSequence.incrementAndGet();
         // 把最新时间戳（包括序列号）和mask做一个与运算，得到真正的时间戳伴随的序列
         long timestampWithSequence = next & timestampAndSequenceMask;
@@ -139,18 +146,29 @@ public class IdWorker {
     }
 
     /**
-     * 阻塞当前线程，如果UUID的QPS过高导致时间戳对应的sequence序号被耗尽 或 出现了时钟回拨问题
+     * 阻塞当前线程
+     *
+     * 如果有大量的线程并发获取UUID、获取UUID的QPS过高，可能会导致从初始化IdWorker时间戳开始 到 当前时间戳的序列号全部用完了
+     * （也可以理解为`某一个毫秒内的sequence耗尽`）；但是时间戳却累加了、进到下一个毫秒（或下几毫秒）。
+     * 然而当前实际时间却还没有到下一毫秒。如果恰巧此时重启了seata server，再初始化IdWorker时的时间戳就有可能会出现重复，进而导致UUID重复
      * block current thread if the QPS of acquiring UUID is too high
      * that current sequence space is exhausted
      */
     private void waitIfNecessary() {
-        // 获取当前时间 以及相应的sequence序列号
+        // 获取当前时间戳 以及相应的sequence序列号
         long currentWithSequence = timestampAndSequence.get();
         // 通过位运算拿到当前的时间戳
         long current = currentWithSequence >>> sequenceBits;
         // 获取当前真实的时间戳
         long newest = getNewestTimestamp();
-        // 如果当前时间戳大于等于真实的时间戳，说明某个毫秒内的sequence序号已经被耗尽了
+        // 如果`timestampAndSequence`中的当前时间戳 大于等于 真实的时间戳，说明从初始化IdWorker时间戳开始 到 当前时间戳的序列号全部用完了 / 某个毫秒内的序列号 已经被耗尽了；
+        /**
+         * seata服务端启动的时候，timestampAndSequence比较小，如果用着用着 timestampAndSequence中的时间到了当前时间，说明前面的QPS很高；
+         * 但是这里就睡眠5ms，可能只是把所有的流量都往后均摊，因为往往高峰期时间也比较短；
+         * 并且一个毫秒会有`4096`个序列号，而从seata Server启动开始也不会立刻就是高峰期，所以到当前时间之前 也会有很多的时间戳给UUID使用；
+         * 不过这个简单粗暴的阻塞线程确实会浪费一些系统资源。
+         *
+         */
         if (current >= newest) {
             try {
                 // 如果获取UUID的QPS过高，导致时间戳对应的sequence序号被耗尽了
@@ -171,6 +189,7 @@ public class IdWorker {
 
     /**
      * auto generate workerId, try using mac first, if failed, then randomly generate one
+     *
      * @return workerId
      */
     private long generateWorkerId() {
@@ -184,12 +203,14 @@ public class IdWorker {
 
     /**
      * use lowest 10 bit of available MAC as workerId
+     *
      * @return workerId
      * @throws Exception when there is no available mac found
      */
     private long generateWorkerIdBaseOnMac() throws Exception {
         Enumeration<NetworkInterface> all = NetworkInterface.getNetworkInterfaces();
         while (all.hasMoreElements()) {
+            // 拿到网络接口
             NetworkInterface networkInterface = all.nextElement();
             boolean isLoopback = networkInterface.isLoopback();
             boolean isVirtual = networkInterface.isVirtual();
@@ -205,6 +226,7 @@ public class IdWorker {
 
     /**
      * randomly generate one as workerId
+     *
      * @return workerId
      */
     private long generateRandomWorkerId() {
