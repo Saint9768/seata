@@ -120,10 +120,11 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
         // 从全局事务上下文中获取xid
         String xid = RootContext.getXID();
         if (xid != null) {
+            // 将xid绑定到ConnectionContext中，后续提交本地事务时会用到
             statementProxy.getConnectionProxy().bind(xid);
         }
 
-        // RootContext.requireGlobalLock()检查是否需要全局锁
+        // RootContext.requireGlobalLock()检查是否需要全局锁，默认需要
         statementProxy.getConnectionProxy().setGlobalLockRequire(RootContext.requireGlobalLock());
         return doExecute(args);
     }
@@ -328,10 +329,12 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
         // 例如：table_name:id_1101
         String lockKeys = buildLockKey(lockKeyRecords);
         if (null != lockKeys) {
+            // 将lockKeys信息保存到ConnectionContext中，在注册分支事务时，再将全局锁信息放入到TC中进行检查、存储
             connectionProxy.appendLockKey(lockKeys);
 
-            // 构建undolog
+            // 2、构建undo log
             SQLUndoLog sqlUndoLog = buildUndoItem(beforeImage, afterImage);
+            // 将undo log信息保存到ConnectionContext中
             connectionProxy.appendUndoLog(sqlUndoLog);
         }
     }

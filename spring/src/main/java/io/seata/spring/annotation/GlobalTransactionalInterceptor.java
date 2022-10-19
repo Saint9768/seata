@@ -91,7 +91,7 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
     private static int degradeCheckPeriod;
     // 是否开启全局事务降级检查
     private static volatile boolean degradeCheck;
-    // 降级检查允许时间
+    // 降级检查允许次数
     private static int degradeCheckAllowTimes;
     // 降级次数
     private static volatile Integer degradeNum = 0;
@@ -182,7 +182,7 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
         // 通过反射获取到被调用目标Class的method方法
         Method specificMethod = ClassUtils.getMostSpecificMethod(methodInvocation.getMethod(), targetClass);
 
-        // 如果目标method不为空，并且方法的DeclaringClass不是Object
+        // 如果目标method不为空，并且方法所属的类不是Object（直接类不是Object，即不是Object类下的几个方法）
         if (specificMethod != null && !specificMethod.getDeclaringClass().equals(Object.class)) {
             // 通过BridgeMethodResolver寻找method的桥接方法
             final Method method = BridgeMethodResolver.findBridgedMethod(specificMethod);

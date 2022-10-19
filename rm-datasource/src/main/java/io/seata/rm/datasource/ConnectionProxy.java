@@ -19,6 +19,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Savepoint;
 import java.util.concurrent.Callable;
+
 import io.seata.common.util.StringUtils;
 import io.seata.config.ConfigurationFactory;
 import io.seata.core.constants.ConfigurationKeys;
@@ -52,10 +53,10 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     private final LockRetryPolicy lockRetryPolicy = new LockRetryPolicy(this);
 
     private static final int REPORT_RETRY_COUNT = ConfigurationFactory.getInstance().getInt(
-        ConfigurationKeys.CLIENT_REPORT_RETRY_COUNT, DEFAULT_CLIENT_REPORT_RETRY_COUNT);
+            ConfigurationKeys.CLIENT_REPORT_RETRY_COUNT, DEFAULT_CLIENT_REPORT_RETRY_COUNT);
 
     public static final boolean IS_REPORT_SUCCESS_ENABLE = ConfigurationFactory.getInstance().getBoolean(
-        ConfigurationKeys.CLIENT_REPORT_SUCCESS_ENABLE, DEFAULT_CLIENT_REPORT_SUCCESS_ENABLE);
+            ConfigurationKeys.CLIENT_REPORT_SUCCESS_ENABLE, DEFAULT_CLIENT_REPORT_SUCCESS_ENABLE);
 
     /**
      * Instantiates a new Connection proxy.
@@ -122,7 +123,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
                     context.getXid(),
                     lockKeys);
             if (!lockable) {
-                throw new LockConflictException(String.format("get lock failed, lockKey: %s",lockKeys));
+                throw new LockConflictException(String.format("get lock failed, lockKey: %s", lockKeys));
             }
         } catch (TransactionException e) {
             recognizeLockKeyConflictException(e, lockKeys);
@@ -141,7 +142,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
         boolean result = false;
         try {
             result = DefaultResourceManager.get().lockQuery(BranchType.AT, getDataSourceProxy().getResourceId(),
-                context.getXid(), lockKeys);
+                    context.getXid(), lockKeys);
         } catch (TransactionException e) {
             recognizeLockKeyConflictException(e, lockKeys);
         }
@@ -154,8 +155,9 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
     // 识别锁key冲突异常
     private void recognizeLockKeyConflictException(TransactionException te, String lockKeys) throws SQLException {
+        // 全局锁冲突
         if (te.getCode() == TransactionExceptionCode.LockKeyConflict
-            || te.getCode() == TransactionExceptionCode.LockKeyConflictFailFast) {
+                || te.getCode() == TransactionExceptionCode.LockKeyConflictFailFast) {
             StringBuilder reasonBuilder = new StringBuilder("get global lock fail, xid:");
             reasonBuilder.append(context.getXid());
             if (StringUtils.isNotBlank(lockKeys)) {
@@ -163,6 +165,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
             }
             throw new LockConflictException(reasonBuilder.toString(), te.getCode());
         } else {
+            // 其他异常
             throw new SQLException(te);
         }
 
@@ -189,8 +192,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     @Override
     public void commit() throws SQLException {
         try {
-            // 真正提交事务
-            // lockRetryPolicy其中包含全局锁的概念，支持retry重试策略
+            // 由LockRetryPolicy负责提交事务，LockRetryPolicy中包含全局锁的概念，支持retry重试策略
             lockRetryPolicy.execute(() -> {
                 doCommit();
                 return null;
@@ -233,14 +235,14 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
 
     private void doCommit() throws SQLException {
-        // 全局事务
+        // 当前DML操作在全局事务中时，判定条件：ConnectionContext中包含xid
         if (context.inGlobalTransaction()) {
             processGlobalTransactionCommit();
         } else if (context.isGlobalLockRequire()) {
-            // 需要获取全局锁
+            // 如果使用了@GlobalLock，需要获取全局锁
             processLocalCommitWithGlobalLocks();
         } else {
-            // 分支事务 或 正常场景
+            // 不在分布式事务中，则以原生connection提交本地事务
             targetConnection.commit();
         }
     }
@@ -249,33 +251,40 @@ public class ConnectionProxy extends AbstractConnectionProxy {
         // 检查全局锁keys，拼接后的keys以;分隔
         checkLock(context.buildLockKeys());
         try {
+            // 以原生connection提交本地事务
             targetConnection.commit();
         } catch (Throwable ex) {
             throw new SQLException(ex);
         }
+        // 重置连接的ConnectionContext
         context.reset();
     }
 
     private void processGlobalTransactionCommit() throws SQLException {
         try {
+            // 向远程的TC中注册分支事务，并检查、增加全局行锁
             register();
         } catch (TransactionException e) {
-            // 全局锁冲突、进行重试
+            // 出现异常时，回滚本地事务 再重试。
+            // 大多数情况是因为全局锁冲突走到这里。
             recognizeLockKeyConflictException(e, context.buildLockKeys());
         }
         try {
-            // 回滚日志管理组件
+            // 回滚日志管理组件，持久化undo log
             UndoLogManagerFactory.getUndoLogManager(this.getDbType()).flushUndoLogs(this);
-            // 本地事务提交
+            // 提交本地事务
             targetConnection.commit();
         } catch (Throwable ex) {
             LOGGER.error("process connectionProxy commit error: {}", ex.getMessage(), ex);
+            // 上报分支事务执行失败，用于监控
             report(false);
             throw new SQLException(ex);
         }
+        // 上报分支事务执行成功，默认不会上报
         if (IS_REPORT_SUCCESS_ENABLE) {
             report(true);
         }
+        // 重置连接的ConnectionContext
         context.reset();
     }
 
@@ -286,7 +295,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
         // 分支事务注册：将事务类型AT、资源ID（资源在前面的流程已经注册过了）、事务xid、全局锁keys作为分支事务信息注册到seata server
         Long branchId = DefaultResourceManager.get().branchRegister(BranchType.AT, getDataSourceProxy().getResourceId(),
-            null, context.getXid(), context.getApplicationData(), context.buildLockKeys());
+                null, context.getXid(), context.getApplicationData(), context.buildLockKeys());
         context.setBranchId(branchId);
     }
 
@@ -326,11 +335,11 @@ public class ConnectionProxy extends AbstractConnectionProxy {
         while (retry > 0) {
             try {
                 DefaultResourceManager.get().branchReport(BranchType.AT, context.getXid(), context.getBranchId(),
-                    commitDone ? BranchStatus.PhaseOne_Done : BranchStatus.PhaseOne_Failed, null);
+                        commitDone ? BranchStatus.PhaseOne_Done : BranchStatus.PhaseOne_Failed, null);
                 return;
             } catch (Throwable ex) {
                 LOGGER.error("Failed to report [" + context.getBranchId() + "/" + context.getXid() + "] commit done ["
-                    + commitDone + "] Retry Countdown: " + retry);
+                        + commitDone + "] Retry Countdown: " + retry);
                 retry--;
 
                 if (retry == 0) {
@@ -342,7 +351,7 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
     public static class LockRetryPolicy {
         protected static final boolean LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT = ConfigurationFactory
-            .getInstance().getBoolean(ConfigurationKeys.CLIENT_LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT, DEFAULT_CLIENT_LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT);
+                .getInstance().getBoolean(ConfigurationKeys.CLIENT_LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT, DEFAULT_CLIENT_LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT);
 
         protected final ConnectionProxy connection;
 
@@ -355,8 +364,10 @@ public class ConnectionProxy extends AbstractConnectionProxy {
             //    LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT == true && connection#autoCommit == true
             // because it has retry acquire lock when AbstractDMLBaseExecutor#executeAutoCommitTrue
             if (LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT && connection.getContext().isAutoCommitChanged()) {
+                // 不需要重试获取全局锁的情况
                 return callable.call();
             } else {
+                // 需要重试获取全局锁的情况，默认
                 // LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT == false
                 // or LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT == true && autoCommit == false
                 return doRetryOnLockConflict(callable);
@@ -369,16 +380,17 @@ public class ConnectionProxy extends AbstractConnectionProxy {
                 try {
                     return callable.call();
                 } catch (LockConflictException lockConflict) {
-                    // 锁冲突异常重试
+                    // 出现全局锁冲突，回滚本地事务
                     onException(lockConflict);
                     // AbstractDMLBaseExecutor#executeAutoCommitTrue the local lock is released
                     if (connection.getContext().isAutoCommitChanged()
-                        && lockConflict.getCode() == TransactionExceptionCode.LockKeyConflictFailFast) {
+                            && lockConflict.getCode() == TransactionExceptionCode.LockKeyConflictFailFast) {
                         lockConflict.setCode(TransactionExceptionCode.LockKeyConflict);
                     }
-                    // 线程睡眠10ms，然后再重试
+                    // 线程睡眠10ms，然后再重试，超过重试次数，抛出异常结束流程
                     lockRetryController.sleep(lockConflict);
                 } catch (Exception e) {
+                    // 出现非全局锁冲突的异常，则直接报错返回
                     onException(e);
                     throw e;
                 }

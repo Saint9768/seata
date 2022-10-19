@@ -67,7 +67,7 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
     private String userName;
 
     /**
-     * 是否启用表元数据的检查，默认不启用
+     * 是否启用表元数据的检查，默认启用
      * Enable the table meta checker
      */
     private static boolean ENABLE_TABLE_META_CHECKER_ENABLE = ConfigurationFactory.getInstance().getBoolean(
@@ -138,6 +138,7 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
         // 注册资源：把当前数据库连接池代理，作为一个资源注册到seata-server
         DefaultResourceManager.get().registerResource(this);
         if (ENABLE_TABLE_META_CHECKER_ENABLE) {
+            // 开启表元数据的检查，定时维护Caffeine Cache中缓存的表元数据
             tableMetaExecutor.scheduleAtFixedRate(() -> {
                 try (Connection connection = dataSource.getConnection()) {
                     TableMetaCacheFactory.getTableMetaCache(DataSourceProxy.this.getDbType())

@@ -269,6 +269,7 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
     public void closeAndClean() throws TransactionException {
         close();
         if (this.hasATBranch()) {
+            // AT模式释放全局锁
             clean();
         }
     }

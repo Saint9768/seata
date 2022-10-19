@@ -52,11 +52,17 @@ public class SeataAutoDataSourceProxyCreator extends AbstractAutoProxyCreator {
         this.advisors = buildAdvisors(dataSourceProxyMode);
     }
 
+    /**
+     * 构建数据源DataSource 需用用到的advisor
+     */
     private Object[] buildAdvisors(String dataSourceProxyMode) {
         Advice advice = new SeataAutoDataSourceProxyAdvice(dataSourceProxyMode);
         return new Object[]{new DefaultIntroductionAdvisor(advice)};
     }
 
+    /**
+     * 为数据源DataSource 添加Advisor
+     */
     @Override
     protected Object[] getAdvicesAndAdvisorsForBean(Class<?> beanClass, String beanName, TargetSource customTargetSource) {
         return advisors;
