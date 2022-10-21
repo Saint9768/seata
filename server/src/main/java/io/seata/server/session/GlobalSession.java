@@ -294,6 +294,7 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
 
     @Override
     public void addBranch(BranchSession branchSession) throws TransactionException {
+        // AbstractSessionManager 将 分支事务会话持久化到DB中
         for (SessionLifecycleListener lifecycleListener : lifecycleListeners) {
             lifecycleListener.onAddBranch(this, branchSession);
         }

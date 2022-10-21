@@ -76,7 +76,7 @@ public abstract class AbstractCore implements Core {
         // 根据xid从DB中找到全局事务会话（会做一个DB查询操作）
         GlobalSession globalSession = assertGlobalSessionNotNull(xid, false);
         return SessionHolder.lockAndExecute(globalSession, () -> {
-            // 检查全局事务会话的状态
+            // 检查全局事务会话的状态；全局事务会话必须是存活的，并且状态必须为：GlobalStatus.Begin
             globalSessionStatusCheck(globalSession);
             globalSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
             // 分支事务会话  根据全局事务开启一个分支事务
@@ -84,10 +84,10 @@ public abstract class AbstractCore implements Core {
                     applicationData, lockKeys, clientId);
             // 将branchID放到ThreadLocal中
             MDC.put(RootContext.MDC_KEY_BRANCH_ID, String.valueOf(branchSession.getBranchId()));
-            // 给分支事务加全局锁
+            // 给分支事务加全局锁，出现锁冲突则报错
             branchSessionLock(globalSession, branchSession);
             try {
-                // 将分支事务会话添加到全局事务会话
+                // 将分支事务会话添加到全局事务会话，持久化分支事务会话
                 globalSession.addBranch(branchSession);
             } catch (RuntimeException ex) {
                 branchSessionUnlock(branchSession);
