@@ -183,6 +183,7 @@ public class DataBaseTransactionStoreManager extends AbstractTransactionStoreMan
         if (CollectionUtils.isNotEmpty(globalTransactionDOs)) {
             List<String> xids =
                 globalTransactionDOs.stream().map(GlobalTransactionDO::getXid).collect(Collectors.toList());
+            // 将分支事务数据也一起查询出来
             if (withBranchSessions) {
                 List<BranchTransactionDO> branchTransactionDOs = logStore.queryBranchTransactionDO(xids);
                 branchTransactionDOsMap = branchTransactionDOs.stream().collect(
@@ -191,6 +192,7 @@ public class DataBaseTransactionStoreManager extends AbstractTransactionStoreMan
         }
         Map<String, List<BranchTransactionDO>> finalBranchTransactionDOsMap = branchTransactionDOsMap;
         return globalTransactionDOs.stream()
+                // 将分支事务添加到全局事务对象GlobalSession中
             .map(globalTransactionDO -> getGlobalSession(globalTransactionDO,
                     finalBranchTransactionDOsMap.get(globalTransactionDO.getXid()), withBranchSessions))
             .collect(Collectors.toList());

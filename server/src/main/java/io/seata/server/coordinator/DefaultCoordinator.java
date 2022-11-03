@@ -434,6 +434,7 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
                     //The function of this 'return' is 'continue'.
                     return;
                 }
+                // 给全局事务会话添加SessionLifecycleListener，用于删除DB/Redis/File中的全局事务、分支事务数据。
                 committingSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
                 core.doGlobalCommit(committingSession, true);
             } catch (TransactionException ex) {
@@ -446,6 +447,8 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
      * Handle async committing.
      */
     protected void handleAsyncCommitting() {
+
+        // 默认获取100条（DB存储模式下可通过`store.db.queryLimit=100`参数配置） 状态为AsyncCommitting的全局事务，走一次DB SQL查询操作
         SessionCondition sessionCondition = new SessionCondition(GlobalStatus.AsyncCommitting);
         Collection<GlobalSession> asyncCommittingSessions =
                 SessionHolder.getAsyncCommittingSessionManager().findGlobalSessions(sessionCondition);
@@ -454,7 +457,9 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
         }
         SessionHelper.forEach(asyncCommittingSessions, asyncCommittingSession -> {
             try {
+                // 给全局事务会话添加SessionLifecycleListener，用于删除DB/Redis/File中的全局事务、分支事务数据。
                 asyncCommittingSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
+                // 全局事务异步提交
                 core.doGlobalCommit(asyncCommittingSession, true);
             } catch (TransactionException ex) {
                 LOGGER.error("Failed to async committing [{}] {} {}", asyncCommittingSession.getXid(), ex.getCode(), ex.getMessage(), ex);
@@ -506,7 +511,7 @@ public class DefaultCoordinator extends AbstractTCInboundHandler implements Tran
             () -> SessionHolder.distributedLockAndExecute(RETRY_COMMITTING, this::handleRetryCommitting), 0,
             COMMITTING_RETRY_PERIOD, TimeUnit.MILLISECONDS);
 
-        // 处理异步提交
+        // 处理异步提交，默认定时任务每次（每秒运行一次）只会处理100个异步提交请求（DB存储模式下可通过`store.db.queryLimit=100`参数配置）
         asyncCommitting.scheduleAtFixedRate(
             () -> SessionHolder.distributedLockAndExecute(ASYNC_COMMITTING, this::handleAsyncCommitting), 0,
             ASYNC_COMMITTING_RETRY_PERIOD, TimeUnit.MILLISECONDS);

@@ -279,6 +279,7 @@ public class LockStoreDataBaseDAO implements LockStore {
             conn = lockStoreDataSource.getConnection();
             conn.setAutoCommit(true);
             //batch release lock by branch list
+            // 根据全局事务xid从lock_table中删除数据，SQL为：delete from lock_table where xid = ?
             String batchDeleteSQL = LockStoreSqlFactory.getLogStoreSql(dbType).getBatchDeleteLockSqlByXid(lockTable);
             ps = conn.prepareStatement(batchDeleteSQL);
             ps.setString(1, xid);

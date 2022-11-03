@@ -51,21 +51,25 @@ public class MySQLUndoUpdateExecutor extends AbstractUndoExecutor {
         TableRecords beforeImage = sqlUndoLog.getBeforeImage();
         List<Row> beforeImageRows = beforeImage.getRows();
         if (CollectionUtils.isEmpty(beforeImageRows)) {
-            throw new ShouldNeverHappenException("Invalid UNDO LOG"); // TODO
+            throw new ShouldNeverHappenException("Invalid UNDO LOG");
         }
         Row row = beforeImageRows.get(0);
 
         List<Field> nonPkFields = row.nonPrimaryKeys();
         // update sql undo log before image all field come from table meta. need add escape.
         // see BaseTransactionalExecutor#buildTableRecords
+        // 根据更新前的数据镜像，拼接所有需要更新的字段，比如：column1 = ?, column2 = ?
         String updateColumns = nonPkFields.stream().map(
             field -> ColumnUtils.addEscape(field.getName(), JdbcConstants.MYSQL) + " = ?").collect(
             Collectors.joining(", "));
 
+        // 获取primary key名称，比如：id
         List<String> pkNameList = getOrderedPkList(beforeImage, row, JdbcConstants.MYSQL).stream().map(e -> e.getName())
             .collect(Collectors.toList());
+        // 构建回滚SQL的where条件，比如：id = ?
         String whereSql = SqlGenerateUtils.buildWhereConditionByPKs(pkNameList, JdbcConstants.MYSQL);
 
+        // 拼接出最终的回滚SQL模板，比如：UPDATE stock_tbl SET count = ? WHERE id = ?
         return String.format(UPDATE_SQL_TEMPLATE, sqlUndoLog.getTableName(), updateColumns, whereSql);
     }
 

@@ -84,6 +84,9 @@ public class DataBaseSessionManager extends AbstractSessionManager
                 throw new StoreException("addGlobalSession failed.");
             }
         } else {
+            // 全局事务异步提交时的taskName为atync.commit.data，将全局事务状态更新为AsyncCommitting。
+            // Seata Server(TC)启动的时候会调用DefaultCoordinator#init()方法初始化一些定时任务，
+            //     todo: 其中就包括每秒执行一次的异步提交全局事务定时任务。
             boolean ret = transactionStoreManager.writeSession(LogOperation.GLOBAL_UPDATE, session);
             if (!ret) {
                 throw new StoreException("addGlobalSession failed.");

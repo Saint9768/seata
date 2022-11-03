@@ -91,10 +91,12 @@ public class AsyncWorker {
      * then doBranchCommit urgently(so that the queue could be empty again) and retry this process.
      */
     private void addToCommitQueue(Phase2Context context) {
-        // 将二阶段上下文添加到一个BlockingQueue中；
+        // 将二阶段上下文添加到一个BlockingQueue中；queue的长度默认为1000，可通过（`client.rm.asyncCommitBufferLimit=10000`配置）
         if (commitQueue.offer(context)) {
             return;
         }
+
+        // 如果队列满了，无法添加`Phase2Context`，则紧急的执行分支事务提交`doBranchCommit()`，分支事务提交之后再将`Phase2Context`添加到阻塞队列`BlockingQueue`中
         CompletableFuture.runAsync(this::doBranchCommitSafely, scheduledExecutor)
                 .thenRun(() -> addToCommitQueue(context));
     }

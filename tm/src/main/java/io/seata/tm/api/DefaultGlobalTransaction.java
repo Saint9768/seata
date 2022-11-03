@@ -125,6 +125,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             return;
         }
         assertXIDNotNull();
+        // 提交全局事务失败重试次数，默认为5，可通过`client.tm.commitRetryCount=5`配置
         int retry = COMMIT_RETRY_COUNT <= 0 ? DEFAULT_TM_COMMIT_RETRY_COUNT : COMMIT_RETRY_COUNT;
         try {
             while (retry > 0) {
@@ -162,12 +163,13 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
         }
         assertXIDNotNull();
 
+        // 回滚全局事务失败重试次数，默认为5，可通过`client.tm.rollbackRetryCount=5`配置
         int retry = ROLLBACK_RETRY_COUNT <= 0 ? DEFAULT_TM_ROLLBACK_RETRY_COUNT : ROLLBACK_RETRY_COUNT;
         try {
             while (retry > 0) {
                 try {
                     retry--;
-                    // 事务回滚
+                    // 事务回滚，走进DefaultTransactionManager
                     status = transactionManager.rollback(xid);
                     break;
                 } catch (Throwable ex) {

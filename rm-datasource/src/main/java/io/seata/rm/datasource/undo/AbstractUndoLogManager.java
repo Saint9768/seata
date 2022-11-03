@@ -228,6 +228,7 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
         branchUndoLog.setBranchId(branchId);
         branchUndoLog.setSqlUndoLogs(connectionContext.getUndoItems());
 
+        // 根据不同的序列化工具（jackson、fastjson、protostuff....），对BranchUndoLog进行编码
         UndoLogParser parser = UndoLogParserFactory.getInstance();
         byte[] undoLogContent = parser.encode(branchUndoLog);
 
@@ -271,18 +272,21 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                 }
 
                 // Find UNDO LOG
+                // 查询undo log日志的SQL为：SELECT * FROM undo_log WHERE branch_id = ? AND xid = ? FOR UPDATE
                 selectPST = conn.prepareStatement(SELECT_UNDO_LOG_SQL);
                 selectPST.setLong(1, branchId);
                 selectPST.setString(2, xid);
                 rs = selectPST.executeQuery();
 
                 boolean exists = false;
+                // 遍历查询到的所有undo log日志
                 while (rs.next()) {
                     exists = true;
 
                     // It is possible that the server repeatedly sends a rollback request to roll back
                     // the same branch transaction to multiple processes,
                     // ensuring that only the undo_log in the normal state is processed.
+                    // 获取回滚日志的状态，如果状态不是Normal，则不支持回滚
                     int state = rs.getInt(ClientTableColumnsName.UNDO_LOG_LOG_STATUS);
                     if (!canUndo(state)) {
                         if (LOGGER.isInfoEnabled()) {
@@ -291,20 +295,23 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                         return;
                     }
 
+                    // 获取到undo log的具体context
                     String contextString = rs.getString(ClientTableColumnsName.UNDO_LOG_CONTEXT);
-                    // 解析回滚日志内容
+                    // 解析回滚日志内容，获取undo log日志的序列化方式serializer=jackson（默认）、压缩方式compressorType=NONE（默认）
                     Map<String, String> context = parseContext(contextString);
                     byte[] rollbackInfo = getRollbackInfo(rs);
 
                     String serializer = context == null ? null : context.get(UndoLogConstants.SERIALIZER_KEY);
                     UndoLogParser parser = serializer == null ? UndoLogParserFactory.getInstance()
                         : UndoLogParserFactory.getInstance(serializer);
+                    // 根据undo_log序列化方式和压缩方式，将其反序列化为BranchUndoLog对象
                     BranchUndoLog branchUndoLog = parser.decode(rollbackInfo);
 
                     try {
                         // put serializer name to local
                         setCurrentSerializer(parser.getName());
                         List<SQLUndoLog> sqlUndoLogs = branchUndoLog.getSqlUndoLogs();
+                        // 如果BranchUndoLog中包含多条SQLUndoLog，则将sqlUndoLogs集合反转；表示业务最后执行的业务SQL，最先做回滚
                         if (sqlUndoLogs.size() > 1) {
                             Collections.reverse(sqlUndoLogs);
                         }
@@ -312,6 +319,7 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                             TableMeta tableMeta = TableMetaCacheFactory.getTableMetaCache(dataSourceProxy.getDbType()).getTableMeta(
                                 conn, sqlUndoLog.getTableName(), dataSourceProxy.getResourceId());
                             sqlUndoLog.setTableMeta(tableMeta);
+                            // 根据SQL类型、DB类型获取到相应的UndoExecutor，就MYSQL的Update语句而言是MySQLUndoUpdateExecutor
                             AbstractUndoExecutor undoExecutor = UndoExecutorFactory.getUndoExecutor(
                                 dataSourceProxy.getDbType(), sqlUndoLog);
                             undoExecutor.executeOn(conn);
@@ -332,6 +340,8 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                 // See https://github.com/seata/seata/issues/489
 
                 if (exists) {
+                    // 分支事务存在undo_log日志，则回滚完成之后 删除所有的undo log日志
+                    // 删除undo log 日志sql为：
                     deleteUndoLog(xid, branchId, conn);
                     conn.commit();
                     if (LOGGER.isInfoEnabled()) {
@@ -339,6 +349,7 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                             State.GlobalFinished.name());
                     }
                 } else {
+                    // 否者插入undo_log日志，日志状态为GlobalFinished
                     insertUndoLogWithGlobalFinished(xid, branchId, UndoLogParserFactory.getInstance(), conn);
                     conn.commit();
                     if (LOGGER.isInfoEnabled()) {

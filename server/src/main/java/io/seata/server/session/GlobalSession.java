@@ -133,6 +133,7 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
     public boolean canBeCommittedAsync() {
         List<BranchSession> branchSessions = getBranchSessions();
         for (BranchSession branchSession : branchSessions) {
+            // 只有所有的分支事务的模式都为AT模式 或 事务状态为一阶段提交失败，才能异步提交全局事务
             if (!branchSession.canBeCommittedAsync()) {
                 return false;
             }
@@ -269,7 +270,7 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
     public void closeAndClean() throws TransactionException {
         close();
         if (this.hasATBranch()) {
-            // AT模式释放全局锁
+            // AT模式释放全局锁，其实就是根据全局事务xid从lock_table中删除数据
             clean();
         }
     }
@@ -746,6 +747,7 @@ public class GlobalSession implements SessionLifecycle, SessionStorable {
     }
 
     public List<BranchSession> getBranchSessions() {
+        // 如果GlobalSession对象中没有BranchSession的信息，则从DB中查询出branchSessions信息，赋值到GlobalSession上。
         loadBranchs();
         return branchSessions;
     }

@@ -186,7 +186,7 @@ public class TransactionalTemplate {
     }
 
     private void completeTransactionAfterThrowing(TransactionInfo txInfo, GlobalTransaction tx, Throwable originalException) throws TransactionalExecutor.ExecutionException {
-        //roll back
+        // roll back，需要导致事务需要进行回滚的异常 是否 符合事务回滚规则
         if (txInfo != null && txInfo.rollbackOn(originalException)) {
             try {
                 rollbackTransaction(tx, originalException);
@@ -197,6 +197,7 @@ public class TransactionalTemplate {
             }
         } else {
             // not roll back on this exception, so commit
+            // 异常不支持回滚，直接提交全局事务
             commitTransaction(tx);
         }
     }

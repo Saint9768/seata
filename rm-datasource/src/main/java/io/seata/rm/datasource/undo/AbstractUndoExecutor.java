@@ -119,18 +119,23 @@ public abstract class AbstractUndoExecutor {
         }
         PreparedStatement undoPST = null;
         try {
+            // 构建回滚SQL模板， 比如：UPDATE stock_tbl SET count = ? WHERE id = ?
             String undoSQL = buildUndoSQL();
             undoPST = conn.prepareStatement(undoSQL);
+            // 获取业务SQL执行前数据镜像的所有行记录
             TableRecords undoRows = getUndoRows();
+            // 遍历所有的数据行记录
             for (Row undoRow : undoRows.getRows()) {
+                // undoValues记载着某个字段需要回到的值
                 ArrayList<Field> undoValues = new ArrayList<>();
+                // 获取行记录的主键对应的 字段和相应的值
                 List<Field> pkValueList = getOrderedPkList(undoRows, undoRow, getDbType(conn));
                 for (Field field : undoRow.getFields()) {
                     if (field.getKeyType() != KeyType.PRIMARY_KEY) {
                         undoValues.add(field);
                     }
                 }
-
+                // 结合数据行数据、回滚SQL模板，拼接出真正的回滚SQL，比如：UPDATE stock_tbl SET count = 89 WHERE id = 1
                 undoPrepare(undoPST, undoValues, pkValueList);
 
                 undoPST.executeUpdate();

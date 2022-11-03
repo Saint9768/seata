@@ -149,19 +149,24 @@ public class DefaultCore implements Core {
 
     @Override
     public GlobalStatus commit(String xid) throws TransactionException {
+        // 根据xid从存储介质（store.mode）中查询出全局事务信息、以及全局事务关联的全部分支事务信息
         GlobalSession globalSession = SessionHolder.findGlobalSession(xid);
         if (globalSession == null) {
             return GlobalStatus.Finished;
         }
+        // 给全局事务会话增加会话生命周期监听器，当全局事务会话关闭时，会用这里添加的AbstractSessionManager，将全局事务会话失活（active=false） 或 用于删除DB/Redis/File中的全局事务、分支事务数据。
         globalSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
         // just lock changeStatus
 
         boolean shouldCommit = SessionHolder.lockAndExecute(globalSession, () -> {
+            // 仅当全局事务状态为Begin的时候，才能提交
             if (globalSession.getStatus() == GlobalStatus.Begin) {
                 // Highlight: Firstly, close the session, then no more branch can be registered.
                 globalSession.closeAndClean();
+                // 所有分支事务的模式为AT 或 事务状态为TCC模式的一阶段，可以异步提交全局事务
                 if (globalSession.canBeCommittedAsync()) {
                     globalSession.asyncCommit();
+                    // 性能指标监控，有需要再关注
                     MetricsPublisher.postSessionDoneEvent(globalSession, GlobalStatus.Committed, false, false);
                     return false;
                 } else {
@@ -172,6 +177,7 @@ public class DefaultCore implements Core {
             return false;
         });
 
+        // AT模式下shouldCommit为false；
         if (shouldCommit) {
             boolean success = doGlobalCommit(globalSession, false);
             //If successful and all remaining branches can be committed asynchronously, do async commit.
@@ -182,6 +188,7 @@ public class DefaultCore implements Core {
                 return globalSession.getStatus();
             }
         } else {
+            // 如果全局事务的状态为AsyncCommitting，则返回GlobalStatus.Committed；否则返回全局事务此时的真实状态。
             return globalSession.getStatus() == GlobalStatus.AsyncCommitting ? GlobalStatus.Committed : globalSession.getStatus();
         }
     }
@@ -216,6 +223,7 @@ public class DefaultCore implements Core {
                     }
                     switch (branchStatus) {
                         case PhaseTwo_Committed:
+                            // 事务的两阶段完成（即：分支事务提交完成），将分支事务数据从branch_table中移除。
                             SessionHelper.removeBranch(globalSession, branchSession, !retrying);
                             return CONTINUE;
                         case PhaseTwo_CommitFailed_Unretryable:
@@ -250,6 +258,7 @@ public class DefaultCore implements Core {
                 return CONTINUE;
             });
             // Return if the result is not null
+            // todo 你以为分支事务都提交完，result会返回点内容？？，实际上CONTINUE常量值是null，所以会继续往下走。
             if (result != null) {
                 return result;
             }
@@ -267,6 +276,7 @@ public class DefaultCore implements Core {
         // if it succeeds and there is no branch, retrying=true is the asynchronous state when retrying. EndCommitted is
         // executed to improve concurrency performance, and the global transaction ends..
         if (success && globalSession.getBranchSessions().isEmpty()) {
+            // 分支事务全部提交之后，将全局事务从global_table中移除。
             SessionHelper.endCommitted(globalSession, retrying);
             LOGGER.info("Committing global transaction is successfully done, xid = {}.", globalSession.getXid());
         }
@@ -275,6 +285,7 @@ public class DefaultCore implements Core {
 
     @Override
     public GlobalStatus rollback(String xid) throws TransactionException {
+        // 根据xid从存储介质（store.mode）中查询出全局事务信息、以及全局事务关联的全部分支事务信息
         GlobalSession globalSession = SessionHolder.findGlobalSession(xid);
         if (globalSession == null) {
             return GlobalStatus.Finished;
@@ -282,7 +293,9 @@ public class DefaultCore implements Core {
         globalSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
         // just lock changeStatus
         boolean shouldRollBack = SessionHolder.lockAndExecute(globalSession, () -> {
+            // 内存层面设置GlobalSession状态active=false，表明不允许分支事务再注册
             globalSession.close(); // Highlight: Firstly, close the session, then no more branch can be registered.
+            // 仅当全局事务状态为Begin的时候，才能回滚，并设置全局事务状态为回滚中，防止重复回滚
             if (globalSession.getStatus() == GlobalStatus.Begin) {
                 globalSession.changeGlobalStatus(GlobalStatus.Rollbacking);
                 return true;
@@ -292,7 +305,7 @@ public class DefaultCore implements Core {
         if (!shouldRollBack) {
             return globalSession.getStatus();
         }
-        
+
         boolean rollbackSuccess = doGlobalRollback(globalSession, false);
         return rollbackSuccess ? GlobalStatus.Rollbacked : globalSession.getStatus();
     }
@@ -306,9 +319,10 @@ public class DefaultCore implements Core {
         if (globalSession.isSaga()) {
             success = getCore(BranchType.SAGA).doGlobalRollback(globalSession, retrying);
         } else {
-            // 遍历所有的分支事务，对分支事务进行回滚
+            // 遍历所有的分支事务（分支事务按执行时间逆向排序，最后执行的分支事务排前面），对分支事务进行回滚
             Boolean result = SessionHelper.forEach(globalSession.getReverseSortedBranches(), branchSession -> {
                 BranchStatus currentBranchStatus = branchSession.getStatus();
+                // 如果事务的状态是一阶段执行失败，则不需要执行回滚，只需要清除分支事务数据（DB中）
                 if (currentBranchStatus == BranchStatus.PhaseOne_Failed) {
                     SessionHelper.removeBranch(globalSession, branchSession, !retrying);
                     return CONTINUE;
@@ -322,10 +336,12 @@ public class DefaultCore implements Core {
                     }
                     switch (branchStatus) {
                         case PhaseTwo_Rollbacked:
+                            // 分支事务回滚成功之后，将DB中的分支事务数据清除
                             SessionHelper.removeBranch(globalSession, branchSession, !retrying);
                             LOGGER.info("Rollback branch transaction successfully, xid = {} branchId = {}", globalSession.getXid(), branchSession.getBranchId());
                             return CONTINUE;
                         case PhaseTwo_RollbackFailed_Unretryable:
+                            // 分支事务回滚失败，并且无法再重试；则打个日志记录下来，需要手动补偿
                             SessionHelper.endRollbackFailed(globalSession, retrying);
                             LOGGER.info("Rollback branch transaction fail and stop retry, xid = {} branchId = {}", globalSession.getXid(), branchSession.getBranchId());
                             return false;
@@ -347,6 +363,7 @@ public class DefaultCore implements Core {
                 }
             });
             // Return if the result is not null
+            // 分支事务都回滚完成之后，CONTINUE常量值是null，所以会继续往下走。
             if (result != null) {
                 return result;
             }
@@ -355,6 +372,7 @@ public class DefaultCore implements Core {
         // In db mode, lock and branch data residual problems may occur.
         // Therefore, execution needs to be delayed here and cannot be executed synchronously.
         if (success) {
+            // 分支事务全部回滚之后，将全局事务从global_table中移除。
             SessionHelper.endRollbacked(globalSession, retrying);
             LOGGER.info("Rollback global transaction successfully, xid = {}.", globalSession.getXid());
         }

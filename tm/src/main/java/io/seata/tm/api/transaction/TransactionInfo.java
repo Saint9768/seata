@@ -66,6 +66,7 @@ public final class TransactionInfo implements Serializable {
         RollbackRule winner = null;
         int deepest = Integer.MAX_VALUE;
 
+        // rollbackRules是GlobalTransactionalInterceptor中开始全局事务时赋值的
         if (CollectionUtils.isNotEmpty(rollbackRules)) {
             winner = NoRollbackRule.DEFAULT_NO_ROLLBACK_RULE;
             for (RollbackRule rule : this.rollbackRules) {
