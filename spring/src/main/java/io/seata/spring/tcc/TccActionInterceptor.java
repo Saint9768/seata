@@ -52,8 +52,10 @@ public class TccActionInterceptor implements MethodInterceptor, ConfigurationCha
     private static final int ORDER_NUM = ConfigurationFactory.getInstance().getInt(TCC_ACTION_INTERCEPTOR_ORDER,
             DefaultValues.TCC_ACTION_INTERCEPTOR_ORDER);
 
+    // TCC action拦截处理处理
     private ActionInterceptorHandler actionInterceptorHandler = new ActionInterceptorHandler();
 
+    // 是否禁用全局事务
     private volatile boolean disable = ConfigurationFactory.getInstance().getBoolean(
         ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION, DEFAULT_DISABLE_GLOBAL_TRANSACTION);
 
@@ -79,26 +81,34 @@ public class TccActionInterceptor implements MethodInterceptor, ConfigurationCha
 
     @Override
     public Object invoke(final MethodInvocation invocation) throws Throwable {
+        // 如果当前事务不处于全局事务中 或 禁用了全局事务 或 当前事务模式为SAGA，则直接执行目标方法；
         if (!RootContext.inGlobalTransaction() || disable || RootContext.inSagaBranch()) {
             //not in transaction, or this interceptor is disabled
             return invocation.proceed();
         }
+        // 获取本次要调用的方法，在class接口中的体现
         Method method = getActionInterfaceMethod(invocation);
         TwoPhaseBusinessAction businessAction = method.getAnnotation(TwoPhaseBusinessAction.class);
-        //try method
+        // try method，方法必须要标注@TwoPhaseBusinessAction注解才会走TCC逻辑
         if (businessAction != null) {
-            //save the xid
+            // save the xid
             String xid = RootContext.getXID();
             //save the previous branchType
             BranchType previousBranchType = RootContext.getBranchType();
             //if not TCC, bind TCC branchType
             if (BranchType.TCC != previousBranchType) {
+                // 将TCC事务模式绑定到RootContext
                 RootContext.bindBranchType(BranchType.TCC);
             }
             try {
-                //Handler the TCC Aspect, and return the business result
-                return actionInterceptorHandler.proceed(method, invocation.getArguments(), xid, businessAction,
-                        invocation::proceed);
+                // Handler the TCC Aspect, and return the business result
+                // 将全局事务xid、方法的入参、@TwoPhaseBusinessAction注解内容、目标业务方法的执行传递到`ActionInterceptorHandler#proceed()`方法中进行TCC切面的处理、业务的执行。
+                return actionInterceptorHandler.proceed(
+                        method, // 目标业务方法
+                        invocation.getArguments(), // 调用方法时传递进来的参数
+                        xid, // 全局事务xid
+                        businessAction, // 标注的@TwoPhaseBusinessAction注解内容
+                        invocation::proceed); // 目标业务方法的执行
             } finally {
                 //if not TCC, unbind branchType
                 if (BranchType.TCC != previousBranchType) {

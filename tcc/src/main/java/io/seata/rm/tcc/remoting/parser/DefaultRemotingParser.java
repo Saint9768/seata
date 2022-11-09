@@ -164,18 +164,24 @@ public class DefaultRemotingParser {
      * @return remoting desc
      */
     public RemotingDesc parserRemotingServiceInfo(Object bean, String beanName, RemotingParser remotingParser) {
+        // 获取Bean实现的标注了@LocalTCC注解的接口信息：接口全路径类名、接口Class信息、实现接口的当前Bean（动态代理后的）
         RemotingDesc remotingBeanDesc = remotingParser.getServiceDesc(bean, beanName);
         if (remotingBeanDesc == null) {
             return null;
         }
+        // 后续获取当前bean对应的LocalTCC信息，走remotingServiceMap缓存
         remotingServiceMap.put(beanName, remotingBeanDesc);
 
         Class<?> interfaceClass = remotingBeanDesc.getInterfaceClass();
         Method[] methods = interfaceClass.getMethods();
+        // 判断当前Bean是否为serviceBean，就LocalTCC而言，走到这里就一定是的。
         if (remotingParser.isService(bean, beanName)) {
             try {
                 //service bean, registry resource
                 Object targetBean = remotingBeanDesc.getTargetBean();
+                // 遍历实现了@LocalTCC接口的所有方法，如果方法上标注了@TwoPhaseBusinessAction注解，则将一些TCC信息包装为TCCResource注册到TC（seata server）
+                //    TCC信息包括：@TwoPhaseBusinessAction名称，目标类，try方法，commit方法、方法名称、方法入参（默认只有BusinessActionContext），rollback方法、方法名称、方法入参（默认只有BusinessActionContext），封装的两阶段方法的key
+                //    将TCCResource注册到TC时，resourceId为@TwoPhaseBusinessAction名称，这也是@TwoPhaseBusinessAction名称要全局唯一的原因
                 for (Method m : methods) {
                     TwoPhaseBusinessAction twoPhaseBusinessAction = m.getAnnotation(TwoPhaseBusinessAction.class);
                     if (twoPhaseBusinessAction != null) {
@@ -197,7 +203,7 @@ public class DefaultRemotingParser {
                                 twoPhaseBusinessAction.commitArgsClasses()));
                         tccResource.setPhaseTwoRollbackKeys(this.getTwoPhaseArgs(tccResource.getRollbackMethod(),
                                 twoPhaseBusinessAction.rollbackArgsClasses()));
-                        //registry tcc resource
+                        // registry tcc resource，将当前TCCResource作为资源注册到TC（Seata Server）中。
                         DefaultResourceManager.get().registerResource(tccResource);
                     }
                 }

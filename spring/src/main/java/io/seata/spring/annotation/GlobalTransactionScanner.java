@@ -278,6 +278,9 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
     /**
      * The following will be scanned, and added corresponding interceptor:
      * 下面的东西将被扫描，并增加相应的拦截器；
+     *    1) TM注解@GlobalTransactional
+     *    2）全局锁注解@GlobalLock
+     *    3）TCC模式下的@TwoPhaseBusinessAction注解 和 @LocalTCC注解，添加的拦截器为TccActionInterceptor
      * TM:
      *
      * @see io.seata.spring.annotation.GlobalTransactional // TM annotation
@@ -311,11 +314,12 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
                     return bean;
                 }
                 interceptor = null;
-                //check TCC proxy TCC的动态代理
+                // 判断一个bean是否需要做TCC的动态代理
                 if (TCCBeanParserUtils.isTccAutoProxy(bean, beanName, applicationContext)) {
                     // init tcc fence clean task if enable useTccFence
                     TCCBeanParserUtils.initTccFenceCleanTask(TCCBeanParserUtils.getRemotingDesc(beanName), applicationContext);
                     //TCC interceptor, proxy bean of sofa:reference/dubbo:reference, and LocalTCC
+                    // ** TCC模式下用的拦截器为TccActionInterceptor
                     interceptor = new TccActionInterceptor(TCCBeanParserUtils.getRemotingDesc(beanName));
                     ConfigurationCache.addConfigListener(ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION,
                             (ConfigurationChangeListener) interceptor);
@@ -337,6 +341,7 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
                                 ConfigurationKeys.DISABLE_GLOBAL_TRANSACTION,
                                 (ConfigurationChangeListener) globalTransactionalInterceptor);
                     }
+                    // ** 除TCC之外的模式，使用的拦截器为GlobalTransactionalInterceptor
                     interceptor = globalTransactionalInterceptor;
                 }
 

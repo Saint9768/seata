@@ -47,13 +47,15 @@ public class TCCBeanParserUtils {
      * @return boolean boolean
      */
     public static boolean isTccAutoProxy(Object bean, String beanName, ApplicationContext applicationContext) {
+        // 判断要调用的Bean
         boolean isRemotingBean = parserRemotingServiceInfo(bean, beanName);
-        //get RemotingBean description
+        // get RemotingBean description
         RemotingDesc remotingDesc = DefaultRemotingParser.get().getRemotingBeanDesc(beanName);
         //is remoting bean
         if (isRemotingBean) {
             if (remotingDesc != null && remotingDesc.getProtocol() == Protocols.IN_JVM) {
                 //LocalTCC
+                // 是否创建一个local tcc代理
                 return isTccProxyTargetBean(remotingDesc);
             } else {
                 // sofa:reference / dubbo:reference, factory bean
@@ -61,7 +63,7 @@ public class TCCBeanParserUtils {
             }
         } else {
             if (remotingDesc == null) {
-                //check FactoryBean
+                // check FactoryBean
                 if (isRemotingFactoryBean(bean, beanName, applicationContext)) {
                     remotingDesc = DefaultRemotingParser.get().getRemotingBeanDesc(beanName);
                     return isTccProxyTargetBean(remotingDesc);
@@ -113,12 +115,16 @@ public class TCCBeanParserUtils {
         }
         //check if it is TCC bean
         boolean isTccClazz = false;
+        // 拿到当前类所属的接口
         Class<?> tccInterfaceClazz = remotingDesc.getInterfaceClass();
+        // 获取接口中的所有的方法
         Method[] methods = tccInterfaceClazz.getMethods();
         TwoPhaseBusinessAction twoPhaseBusinessAction;
+        // 遍历所有的方法，获取到方法中是否加了@TwoPhaseBusinessAction注解
         for (Method method : methods) {
             twoPhaseBusinessAction = method.getAnnotation(TwoPhaseBusinessAction.class);
             if (twoPhaseBusinessAction != null) {
+                // 只要有一个方法加了@TwoPhaseBusinessAction注解，则返回true。
                 isTccClazz = true;
                 break;
             }
@@ -127,7 +133,7 @@ public class TCCBeanParserUtils {
             return false;
         }
         short protocols = remotingDesc.getProtocol();
-        //LocalTCC
+        // LocalTCC，表示走本地调用，不走RPC远程调用
         if (Protocols.IN_JVM == protocols) {
             //in jvm TCC bean , AOP
             return true;
@@ -174,6 +180,7 @@ public class TCCBeanParserUtils {
      * @return if sofa:service, sofa:reference, dubbo:reference, dubbo:service return true, else return false
      */
     protected static boolean parserRemotingServiceInfo(Object bean, String beanName) {
+        // `RemotingParser`负责提取远程处理bean信息
         RemotingParser remotingParser = DefaultRemotingParser.get().isRemoting(bean, beanName);
         if (remotingParser != null) {
             return DefaultRemotingParser.get().parserRemotingServiceInfo(bean, beanName, remotingParser) != null;

@@ -84,17 +84,20 @@ public class TCCResourceManager extends AbstractResourceManager {
     @Override
     public BranchStatus branchCommit(BranchType branchType, String xid, long branchId, String resourceId,
                                      String applicationData) throws TransactionException {
+        // 根据resourceId（也就是@TwoPhaseBusinessAction注解中的name()）从内存层面的缓存Map中获取到对应的TCCResource；
         TCCResource tccResource = (TCCResource)tccResourceCache.get(resourceId);
         if (tccResource == null) {
             throw new ShouldNeverHappenException(String.format("TCC resource is not exist, resourceId: %s", resourceId));
         }
+        // 获取目标bean
         Object targetTCCBean = tccResource.getTargetBean();
+        // 获取目标bean的commit()方法
         Method commitMethod = tccResource.getCommitMethod();
         if (targetTCCBean == null || commitMethod == null) {
             throw new ShouldNeverHappenException(String.format("TCC resource is not available, resourceId: %s", resourceId));
         }
         try {
-            //BusinessActionContext
+            // BusinessActionContext数据会作为applicationData的一部分，由TC发送过来。需要从中提取出两阶段提交的参数（比如解析@BusinessActionContextParameter注解得到的数据）；
             BusinessActionContext businessActionContext = getBusinessActionContext(xid, branchId, resourceId,
                 applicationData);
             Object[] args = this.getTwoPhaseCommitArgs(tccResource, businessActionContext);
@@ -108,6 +111,7 @@ public class TCCResourceManager extends AbstractResourceManager {
                     throw e.getCause();
                 }
             } else {
+                // 使用反射将BusinessActionContext作为入参对目标bean的commit()方法进行调用
                 ret = commitMethod.invoke(targetTCCBean, args);
                 if (ret != null) {
                     if (ret instanceof TwoPhaseResult) {
@@ -142,17 +146,20 @@ public class TCCResourceManager extends AbstractResourceManager {
     @Override
     public BranchStatus branchRollback(BranchType branchType, String xid, long branchId, String resourceId,
                                        String applicationData) throws TransactionException {
+        // 根据resourceId（也就是@TwoPhaseBusinessAction注解中的name()）从内存层面的缓存Map中获取到对应的TCCResource；
         TCCResource tccResource = (TCCResource)tccResourceCache.get(resourceId);
         if (tccResource == null) {
             throw new ShouldNeverHappenException(String.format("TCC resource is not exist, resourceId: %s", resourceId));
         }
+        // 获取目标bean
         Object targetTCCBean = tccResource.getTargetBean();
+        // 获取目标bean的collback()方法
         Method rollbackMethod = tccResource.getRollbackMethod();
         if (targetTCCBean == null || rollbackMethod == null) {
             throw new ShouldNeverHappenException(String.format("TCC resource is not available, resourceId: %s", resourceId));
         }
         try {
-            //BusinessActionContext
+            // BusinessActionContext数据会作为applicationData的一部分，由TC发送过来。需要从中提取出两阶段提交的参数（比如解析@BusinessActionContextParameter注解得到的数据）；
             BusinessActionContext businessActionContext = getBusinessActionContext(xid, branchId, resourceId,
                 applicationData);
             Object[] args = this.getTwoPhaseRollbackArgs(tccResource, businessActionContext);
@@ -167,6 +174,7 @@ public class TCCResourceManager extends AbstractResourceManager {
                     throw e.getCause();
                 }
             } else {
+                // 使用反射将BusinessActionContext作为入参对目标bean的commit()方法进行调用
                 ret = rollbackMethod.invoke(targetTCCBean, args);
                 if (ret != null) {
                     if (ret instanceof TwoPhaseResult) {

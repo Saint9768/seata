@@ -220,7 +220,7 @@ public final class RmNettyRemotingClient extends AbstractNettyRemotingClient {
                 if (LOGGER.isInfoEnabled()) {
                     LOGGER.info("will register resourceId:{}", resourceId);
                 }
-                // 向seata-server发起数据库连接注册请求
+                // 向seata-server发起RM资源注册请求
                 sendRegisterMessage(serverAddress, rmChannel, resourceId);
             }
         }

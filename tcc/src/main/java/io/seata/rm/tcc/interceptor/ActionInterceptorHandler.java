@@ -24,6 +24,7 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 
 import com.alibaba.fastjson.JSON;
+import com.sun.org.apache.xml.internal.security.Init;
 import io.seata.common.Constants;
 import io.seata.common.exception.FrameworkException;
 import io.seata.common.exception.SkipCallbackWrapperException;
@@ -64,21 +65,22 @@ public class ActionInterceptorHandler {
      */
     public Object proceed(Method method, Object[] arguments, String xid, TwoPhaseBusinessAction businessAction,
                                        Callback<Object> targetCallback) throws Throwable {
-        //Get action context from arguments, or create a new one and then reset to arguments
+        // Get action context from arguments, or create a new one and then reset to arguments
+        // 尝试从方法入参中获取BusinessActionContext，如果获取不到，则创建一个BusinessActionContext
         BusinessActionContext actionContext = getOrCreateActionContextAndResetToArguments(method.getParameterTypes(), arguments);
 
-        //Set the xid
+        // Set the xid
         actionContext.setXid(xid);
-        //Set the action name
+        // Set the action name，TCC注解@TwoPhaseBusinessAction中定义的tcc业务动作名称
         String actionName = businessAction.name();
         actionContext.setActionName(actionName);
-        //Set the delay report
+        // Set the delay report，延时report上报
         actionContext.setDelayReport(businessAction.isDelayReport());
 
-        //Creating Branch Record
+        // Creating Branch Record，发起TCC分支事务的注册 并 创建分支事务的记录，拿到TC返回的branch_id
         String branchId = doTccActionLogStore(method, arguments, businessAction, actionContext);
         actionContext.setBranchId(branchId);
-        //MDC put branchId
+        // MDC put branchId
         MDC.put(RootContext.MDC_KEY_BRANCH_ID, branchId);
 
         // save the previous action context
@@ -99,7 +101,7 @@ public class ActionInterceptorHandler {
                     throw originException;
                 }
             } else {
-                //Execute business, and return the business result
+                // 执行目标方法，Execute business, and return the business result
                 return targetCallback.execute();
             }
         } finally {
@@ -131,8 +133,11 @@ public class ActionInterceptorHandler {
 
         // get the action context from arguments
         int argIndex = 0;
+        // 遍历方法调用时传递的参数类型
         for (Class<?> parameterType : parameterTypes) {
+            // 如果某个参数的类型为BusinessActionContext（因为prepare方法可以接收一个BusinessActionContext类型的参数），
             if (BusinessActionContext.class.isAssignableFrom(parameterType)) {
+                // 获取BusinessActionContext类型参数对应的具体参数
                 actionContext = (BusinessActionContext)arguments[argIndex];
                 if (actionContext == null) {
                     // If the action context exists in arguments but is null, create a new one and reset the action context to the arguments
@@ -170,12 +175,16 @@ public class ActionInterceptorHandler {
 
         //region fetch context and init action context
 
+        // 根据@BusinessActionContextParameter从方法入参中提取出一些数据放到BusinessActionContext上下文中
         Map<String, Object> context = fetchActionRequestContext(method, arguments);
+        // 记录TCC开始的时间
         context.put(Constants.ACTION_START_TIME, System.currentTimeMillis());
 
-        //Init business context
+        // Init business context，
+        // 初始化业务上下文，将@TwoPhaseBusinessAction的参数（name()、commit()、rollback()、useTCCFence()）放到上下文中
         initBusinessContext(context, method, businessAction);
-        //Init running environment context
+        //I nit running environment context
+        // 将本地ip添加到BusinessActionContext中
         initFrameworkContext(context);
 
         Map<String, Object> originContext = actionContext.getActionContext();
@@ -194,7 +203,8 @@ public class ActionInterceptorHandler {
         Map<String, Object> applicationContext = Collections.singletonMap(Constants.TCC_ACTION_CONTEXT, context);
         String applicationContextStr = JSON.toJSONString(applicationContext);
         try {
-            //registry branch record
+            // registry branch record
+            // 向TC发起分支事务注册请求
             Long branchId = DefaultResourceManager.get().branchRegister(BranchType.TCC, actionName, null, xid,
                     applicationContextStr, null);
             return String.valueOf(branchId);
@@ -251,8 +261,10 @@ public class ActionInterceptorHandler {
         Map<String, Object> context = new HashMap<>(8);
 
         Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+        // 方法的入参也可以是加了注解的
         for (int i = 0; i < parameterAnnotations.length; i++) {
             for (int j = 0; j < parameterAnnotations[i].length; j++) {
+                // 如果方法的某个入参加了@BusinessActionContextParameter注解
                 if (parameterAnnotations[i][j] instanceof BusinessActionContextParameter) {
                     // get annotation
                     BusinessActionContextParameter annotation = (BusinessActionContextParameter)parameterAnnotations[i][j];
@@ -267,6 +279,7 @@ public class ActionInterceptorHandler {
                     }
 
                     // load param by the config of annotation, and then put into the context
+                    // 根据注解的配置提取出入参的名称和值，然后让它们放入到BusinessActionContext中。
                     ActionContextUtil.loadParamByAnnotationAndPutToContext(ParamType.PARAM, "", paramObject, annotation, context);
                 }
             }

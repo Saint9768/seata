@@ -28,6 +28,8 @@ public abstract class AbstractedRemotingParser implements RemotingParser {
 
     @Override
     public boolean isRemoting(Object bean, String beanName) throws FrameworkException {
+        // 就`LocalTCCRemotingParser`而言，其`isReference()`方法和`isService()`方法的实现都一样的逻辑：
+        //     判断当前bean实现的所有接口中是否有接口标注了`@LocalTCC`注解。
         return isReference(bean, beanName) || isService(bean, beanName);
     }
 
