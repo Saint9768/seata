@@ -104,6 +104,7 @@ public class TCCResourceManager extends AbstractResourceManager {
             Object ret;
             boolean result;
             // add idempotent and anti hanging
+            // TCCFence用于TCC空回滚、幂等、悬挂问题的解决。
             if (Boolean.TRUE.equals(businessActionContext.getActionContext(Constants.USE_TCC_FENCE))) {
                 try {
                     result = TCCFenceHandler.commitFence(commitMethod, targetTCCBean, xid, branchId, args);
@@ -166,6 +167,7 @@ public class TCCResourceManager extends AbstractResourceManager {
             Object ret;
             boolean result;
             // add idempotent and anti hanging
+            // TCCFence用于TCC空回滚、幂等、悬挂问题的解决。
             if (Boolean.TRUE.equals(businessActionContext.getActionContext(Constants.USE_TCC_FENCE))) {
                 try {
                     result = TCCFenceHandler.rollbackFence(rollbackMethod, targetTCCBean, xid, branchId,

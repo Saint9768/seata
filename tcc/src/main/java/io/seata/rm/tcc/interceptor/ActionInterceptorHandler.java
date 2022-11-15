@@ -89,6 +89,7 @@ public class ActionInterceptorHandler {
             //share actionContext implicitly
             BusinessActionContextUtil.setContext(actionContext);
 
+            // TCCFence用于TCC空回滚、幂等、悬挂问题的解决。
             if (businessAction.useTCCFence()) {
                 try {
                     // Use TCC Fence, and return the business result

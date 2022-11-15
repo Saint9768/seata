@@ -97,6 +97,7 @@ public class TCCFenceHandler {
         return transactionTemplate.execute(status -> {
             try {
                 Connection conn = DataSourceUtils.getConnection(dataSource);
+                // 尝试新增一条事务控制记录，状态为已尝试，如果新增失败、说明存在悬挂问题，直接抛出异常
                 boolean result = insertTCCFenceLog(conn, xid, branchId, actionName, TCCFenceConstant.STATUS_TRIED);
                 LOGGER.info("TCC fence prepare result: {}. xid: {}, branchId: {}", result, xid, branchId);
                 if (result) {
@@ -134,21 +135,26 @@ public class TCCFenceHandler {
         return transactionTemplate.execute(status -> {
             try {
                 Connection conn = DataSourceUtils.getConnection(dataSource);
+                // 执行TCC事务的二阶段commit()方法时会先根据xid和branch_id判断是否存在TCCFenceLog；
                 TCCFenceDO tccFenceDO = TCC_FENCE_DAO.queryTCCFenceDO(conn, xid, branchId);
+                // 不存在，则抛出异常
                 if (tccFenceDO == null) {
                     throw new TCCFenceException(String.format("TCC fence record not exists, commit fence method failed. xid= %s, branchId= %s", xid, branchId),
                             FrameworkErrorCode.RecordAlreadyExists);
                 }
+                // 存在，并且状态是已提交，说明是重复提交，直接返回操作成功。
                 if (TCCFenceConstant.STATUS_COMMITTED == tccFenceDO.getStatus()) {
                     LOGGER.info("Branch transaction has already committed before. idempotency rejected. xid: {}, branchId: {}, status: {}", xid, branchId, tccFenceDO.getStatus());
                     return true;
                 }
+                // 存在，并且状态是已回滚、悬挂，打印个日志，直接返回操作失败。
                 if (TCCFenceConstant.STATUS_ROLLBACKED == tccFenceDO.getStatus() || TCCFenceConstant.STATUS_SUSPENDED == tccFenceDO.getStatus()) {
                     if (LOGGER.isWarnEnabled()) {
                         LOGGER.warn("Branch transaction status is unexpected. xid: {}, branchId: {}, status: {}", xid, branchId, tccFenceDO.getStatus());
                     }
                     return false;
                 }
+                // 存在，并且状态是已尝试，则更新TCCFenceLog记录状态为已提交。
                 return updateStatusAndInvokeTargetMethod(conn, commitMethod, targetTCCBean, xid, branchId, TCCFenceConstant.STATUS_COMMITTED, status, args);
             } catch (Throwable t) {
                 status.setRollbackOnly();
@@ -173,8 +179,10 @@ public class TCCFenceHandler {
         return transactionTemplate.execute(status -> {
             try {
                 Connection conn = DataSourceUtils.getConnection(dataSource);
+                // 执行TCC事务的二阶段cancel()方法时会先根据xid和branch_id判断是否存在TCCFenceLog；
                 TCCFenceDO tccFenceDO = TCC_FENCE_DAO.queryTCCFenceDO(conn, xid, branchId);
                 // non_rollback
+                // 空回滚：不存在，则插入一条状态为悬挂的记录；
                 if (tccFenceDO == null) {
                     boolean result = insertTCCFenceLog(conn, xid, branchId, actionName, TCCFenceConstant.STATUS_SUSPENDED);
                     LOGGER.info("Insert tcc fence record result: {}. xid: {}, branchId: {}", result, xid, branchId);
@@ -184,10 +192,12 @@ public class TCCFenceHandler {
                     }
                     return true;
                 } else {
+                    // 存在，并且状态是已回滚、悬挂，说明是重复提交，直接返回操作成功。
                     if (TCCFenceConstant.STATUS_ROLLBACKED == tccFenceDO.getStatus() || TCCFenceConstant.STATUS_SUSPENDED == tccFenceDO.getStatus()) {
                         LOGGER.info("Branch transaction had already rollbacked before, idempotency rejected. xid: {}, branchId: {}, status: {}", xid, branchId, tccFenceDO.getStatus());
                         return true;
                     }
+                    // 存在，并且状态是已提交，打印个日志，直接返回操作失败。
                     if (TCCFenceConstant.STATUS_COMMITTED == tccFenceDO.getStatus()) {
                         if (LOGGER.isWarnEnabled()) {
                             LOGGER.warn("Branch transaction status is unexpected. xid: {}, branchId: {}, status: {}", xid, branchId, tccFenceDO.getStatus());
@@ -195,6 +205,7 @@ public class TCCFenceHandler {
                         return false;
                     }
                 }
+                // 存在，并且状态是已尝试，则更新TCCFenceLog记录状态为已回滚。
                 return updateStatusAndInvokeTargetMethod(conn, rollbackMethod, targetTCCBean, xid, branchId, TCCFenceConstant.STATUS_ROLLBACKED, status, args);
             } catch (Throwable t) {
                 status.setRollbackOnly();
