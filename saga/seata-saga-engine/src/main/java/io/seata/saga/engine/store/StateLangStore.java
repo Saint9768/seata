@@ -26,6 +26,7 @@ public interface StateLangStore {
 
     /**
      * Query the state machine definition by id
+     * 根据状态机ID获取状态机
      *
      * @param stateMachineId
      * @return
@@ -34,6 +35,7 @@ public interface StateLangStore {
 
     /**
      * Get the latest version of the state machine by state machine name
+     * 根据状态机名称和租户ID获取最新版本的状态机
      *
      * @param stateMachineName
      * @param tenantId
@@ -43,6 +45,7 @@ public interface StateLangStore {
 
     /**
      * Storage state machine definition
+     * 存储一个状态机
      *
      * @param stateMachine
      * @return

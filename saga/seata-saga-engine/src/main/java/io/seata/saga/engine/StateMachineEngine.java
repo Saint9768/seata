@@ -23,6 +23,7 @@ import io.seata.saga.statelang.domain.StateMachineInstance;
 
 /**
  * State machine engine
+ * 状态机引擎接口
  *
  * @author lorne.cl
  */
@@ -30,6 +31,7 @@ public interface StateMachineEngine {
 
     /**
      * start a state machine instance
+     * 根据状态机名称、租户ID、启动参数启动状态机实例
      *
      * @param stateMachineName
      * @param tenantId
@@ -55,6 +57,7 @@ public interface StateMachineEngine {
 
     /**
      * start a state machine instance asynchronously
+     * 异步运行状态机实例，状态机实例执行完之后回调callback接口
      *
      * @param stateMachineName
      * @param tenantId
@@ -106,6 +109,7 @@ public interface StateMachineEngine {
 
     /**
      * compensate a state machine instance
+     * 对一个状态机实例进行补偿
      *
      * @param stateMachineInstId
      * @param replaceParams
@@ -129,6 +133,7 @@ public interface StateMachineEngine {
 
     /**
      * skip current failed state instance and forward restart state machine instance
+     * 跳过当前失败的状态实例 并且推进重启状态机实例
      *
      * @param stateMachineInstId
      * @return

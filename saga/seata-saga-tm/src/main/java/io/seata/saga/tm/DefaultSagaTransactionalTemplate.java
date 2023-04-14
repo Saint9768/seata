@@ -84,6 +84,7 @@ public class DefaultSagaTransactionalTemplate
         GlobalTransaction tx = GlobalTransactionContext.getCurrentOrCreate();
         try {
             triggerBeforeBegin();
+            // 开启全局事务
             tx.begin(txInfo.getTimeOut(), txInfo.getName());
             triggerAfterBegin();
         } catch (TransactionException txe) {

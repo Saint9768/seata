@@ -98,6 +98,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             return;
         }
         assertXIDNull();
+        // 已经存在全局事务ID则抛出异常
         String currentXid = RootContext.getXID();
         if (currentXid != null) {
             throw new IllegalStateException("Global transaction already exists," +

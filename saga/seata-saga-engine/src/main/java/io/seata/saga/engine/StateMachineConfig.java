@@ -40,6 +40,7 @@ public interface StateMachineConfig {
 
     /**
      * Gets state log store.
+     * 获取状态日志数据的仓储组件（获取状态机实例、状态实例的数据）
      *
      * @return the StateLogRepository
      */
@@ -47,6 +48,8 @@ public interface StateMachineConfig {
 
     /**
      * Gets get state log store.
+     * 获取状态日志存储组件（记录状态机实例事件、状态实例事件数据，获取状态机实例、状态实例的数据）
+     * StateLogStore 比 StateLogRepository 功能更多
      *
      * @return the get StateLogStore
      */
@@ -54,6 +57,7 @@ public interface StateMachineConfig {
 
     /**
      * Gets get state language definition store.
+     * 获取状态定义存储组件（对状态机定义的数据进行存取）
      *
      * @return the get StateLangStore
      */
@@ -61,6 +65,7 @@ public interface StateMachineConfig {
 
     /**
      * Gets get expression factory manager.
+     * 获取表达式工厂管理组件（解析状态机中的表达式）
      *
      * @return the get expression factory manager
      */
@@ -68,6 +73,7 @@ public interface StateMachineConfig {
 
     /**
      * Gets get evaluator factory manager.
+     * 获取表达式计算工厂管理器
      *
      * @return the get evaluator factory manager
      */
@@ -89,6 +95,7 @@ public interface StateMachineConfig {
 
     /**
      * Gets get state machine repository.
+     * 获取状态机仓储组件
      *
      * @return the get state machine repository
      */
@@ -110,6 +117,7 @@ public interface StateMachineConfig {
 
     /**
      * Gets get process ctrl event publisher.
+     * 获取流程控制事件发布组件
      *
      * @return the get process ctrl event publisher
      */
@@ -117,6 +125,7 @@ public interface StateMachineConfig {
 
     /**
      * Gets get async process ctrl event publisher.
+     * 获取异步化的流程控制事件发布组件
      *
      * @return the get async process ctrl event publisher
      */
@@ -124,6 +133,7 @@ public interface StateMachineConfig {
 
     /**
      * Gets get application context.
+     * 获取应用容器
      *
      * @return the get application context
      */
@@ -131,6 +141,7 @@ public interface StateMachineConfig {
 
     /**
      * Gets get thread pool executor.
+     * 获取线程池
      *
      * @return the get thread pool executor
      */
@@ -145,6 +156,7 @@ public interface StateMachineConfig {
 
     /**
      * get ServiceInvokerManager
+     * 获取服务调用管理器
      *
      * @return
      */
@@ -152,12 +164,16 @@ public interface StateMachineConfig {
 
     /**
      * get trans operation timeout
+     * 事务超时时间
+     *
      * @return
      */
     int getTransOperationTimeout();
 
     /**
      * get service invoke timeout
+     * 服务调用超时时间
+     *
      * @return
      */
     int getServiceInvokeTimeout();

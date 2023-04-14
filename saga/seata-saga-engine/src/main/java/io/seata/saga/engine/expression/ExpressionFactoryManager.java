@@ -29,8 +29,10 @@ public class ExpressionFactoryManager {
 
     public static final String DEFAULT_EXPRESSION_TYPE = "Default";
 
+    // 表达式类型 -> 表达式工厂
     private Map<String, ExpressionFactory> expressionFactoryMap = new ConcurrentHashMap<>();
 
+    // 根据不同的表达式类型获取表达式工厂组件
     public ExpressionFactory getExpressionFactory(String expressionType) {
         if (StringUtils.isBlank(expressionType)) {
             expressionType = DEFAULT_EXPRESSION_TYPE;

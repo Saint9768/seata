@@ -83,11 +83,13 @@ public class StateMachineRepositoryImpl implements StateMachineRepository {
 
     @Override
     public StateMachine getStateMachine(String stateMachineName, String tenantId) {
+        // 优先根据状态机名称和租户ID从内存Map中获取
         Item item = CollectionUtils.computeIfAbsent(stateMachineMapByNameAndTenant, stateMachineName + "_" + tenantId,
             key -> new Item());
         if (item.getValue() == null && stateLangStore != null) {
             synchronized (item) {
                 if (item.getValue() == null) {
+                    // 如果走内存Map获取不到，则从DB中获取
                     StateMachine stateMachine = stateLangStore.getLastVersionStateMachine(stateMachineName, tenantId);
                     if (stateMachine != null) {
                         StateMachine parsedStatMachine = StateMachineParserFactory.getStateMachineParser(jsonParserName).parse(
@@ -120,7 +122,9 @@ public class StateMachineRepositoryImpl implements StateMachineRepository {
         String stateMachineName = stateMachine.getName();
         String tenantId = stateMachine.getTenantId();
 
+        // 流程定义存储
         if (stateLangStore != null) {
+            // 使用流程定义存储组件 根据状态机名称、租户ID 查询已有的最新版本的旧的状态机
             StateMachine oldStateMachine = stateLangStore.getLastVersionStateMachine(stateMachineName, tenantId);
 
             if (oldStateMachine != null) {
@@ -132,6 +136,7 @@ public class StateMachineRepositoryImpl implements StateMachineRepository {
                 } catch (UnsupportedEncodingException e) {
                     LOGGER.error(e.getMessage(), e);
                 }
+                // 旧状态机内容和新状态机内容一样，将旧状态机的ID、创建时间赋值给新状态机，直接return新状态机
                 if (Arrays.equals(bytesContent, oldBytesContent) && stateMachine.getVersion() != null && stateMachine
                     .getVersion().equals(oldStateMachine.getVersion())) {
 
@@ -146,18 +151,23 @@ public class StateMachineRepositoryImpl implements StateMachineRepository {
                     return stateMachine;
                 }
             }
+            // 如果状态机的ID为空，则使用序号生成器生成一个ID
             if (StringUtils.isBlank(stateMachine.getId())) {
                 stateMachine.setId(seqGenerator.generate(DomainConstants.SEQ_ENTITY_STATE_MACHINE));
             }
+            // 设置创建时间
             stateMachine.setGmtCreate(new Date());
+            // 将状态机存储
             stateLangStore.storeStateMachine(stateMachine);
         }
 
+        // 如果状态机的ID为空，则使用序号生成器生成一个ID
         if (StringUtils.isBlank(stateMachine.getId())) {
             stateMachine.setId(seqGenerator.generate(DomainConstants.SEQ_ENTITY_STATE_MACHINE));
         }
 
         Item item = new Item(stateMachine);
+        // 将状态机数据放在内存中（以状态机名称_租户ID为key、以状态ID为key，状态机为value）
         stateMachineMapByNameAndTenant.put(stateMachineName + "_" + tenantId, item);
         stateMachineMapById.put(stateMachine.getId(), item);
         return stateMachine;
@@ -166,11 +176,14 @@ public class StateMachineRepositoryImpl implements StateMachineRepository {
     @Override
     public void registryByResources(Resource[] resources, String tenantId) throws IOException {
         if (resources != null) {
+            // 遍历所有的状态机定义JSON文件
             for (Resource resource : resources) {
                 String json;
+                // 1> 基于IO流将状态机定义JSON文件 读取成响应字符集的JSON字符串
                 try (InputStream is = resource.getInputStream()) {
                     json = IOUtils.toString(is, charset);
                 }
+                // 2> 从状态机解析工厂中根据 JSON解析名称 获取一个状态机解析器，并对JSON字符串进行解析，解析完之后可以拿到一个状态机
                 StateMachine stateMachine = StateMachineParserFactory.getStateMachineParser(jsonParserName).parse(json);
                 if (stateMachine != null) {
                     stateMachine.setContent(json);

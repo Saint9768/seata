@@ -53,6 +53,7 @@ import org.springframework.util.StringUtils;
 
 /**
  * ProcessCtrl-based state machine engine
+ * 基于流程控制的状态机引擎
  *
  * @author lorne.cl
  */
@@ -99,30 +100,51 @@ public class ProcessCtrlStateMachineEngine implements StateMachineEngine {
         return startInternal(stateMachineName, tenantId, businessKey, startParams, true, callback);
     }
 
+    /**
+     * 真正启动状态机实例的地方
+     * @param stateMachineName 状态机名称
+     * @param tenantId 租户ID
+     * @param businessKey 业务Key
+     * @param startParams 状态机启动参数，（调用方传递进来，如果不传parentId，则saga事务会额外开启一个全局事务）
+     * @param async 是否是异步
+     * @param callback 异步的回调
+     * @return
+     * @throws EngineExecutionException
+     */
     private StateMachineInstance startInternal(String stateMachineName, String tenantId, String businessKey,
                                                Map<String, Object> startParams, boolean async, AsyncCallback callback)
             throws EngineExecutionException {
         try {
+            // 1> 若是使用异步方式启动状态机实例，但是状态机配置上却不支持异步，直接抛出异常
             if (async && !stateMachineConfig.isEnableAsync()) {
                 throw new EngineExecutionException(
                     "Asynchronous start is disabled. please set StateMachineConfig.enableAsync=true first.",
                     FrameworkErrorCode.AsynchronousStartDisabled);
             }
 
+            // 如果租户ID为空，则使用默认的租户ID
             if (StringUtils.isEmpty(tenantId)) {
                 tenantId = stateMachineConfig.getDefaultTenantId();
             }
 
+            // 2> 创建一个状态机实例
             StateMachineInstance instance = createMachineInstance(stateMachineName, tenantId, businessKey, startParams);
 
-            ProcessContextBuilder contextBuilder = ProcessContextBuilder.create().withProcessType(ProcessType.STATE_LANG)
-                .withOperationName(DomainConstants.OPERATION_NAME_START).withAsyncCallback(callback).withInstruction(
-                    new StateInstruction(stateMachineName, tenantId)).withStateMachineInstance(instance)
-                .withStateMachineConfig(getStateMachineConfig()).withStateMachineEngine(this);
+            // 创建一个流程上下文构建器（用于构建流程运行的上下文）
+            ProcessContextBuilder contextBuilder = ProcessContextBuilder.create()
+                    .withProcessType(ProcessType.STATE_LANG) // 流程类型
+                    .withOperationName(DomainConstants.OPERATION_NAME_START) // 操作名称
+                    .withAsyncCallback(callback) // 设置异步回调的函数
+                    .withInstruction(new StateInstruction(stateMachineName, tenantId)) // 状态获取组件
+                    .withStateMachineInstance(instance) // 状态机实例
+                    .withStateMachineConfig(getStateMachineConfig()) // 状态机配置
+                    .withStateMachineEngine(this); // 状态机引擎
 
+            // 上下文变量的Map
             Map<String, Object> contextVariables;
             if (startParams != null) {
                 contextVariables = new ConcurrentHashMap<>(startParams.size());
+                // 将上下文启动参数的数据全部拷贝到上下文变量Map中
                 nullSafeCopy(startParams, contextVariables);
             } else {
                 contextVariables = new ConcurrentHashMap<>();
@@ -133,11 +155,16 @@ public class ProcessCtrlStateMachineEngine implements StateMachineEngine {
 
             contextBuilder.withIsAsyncExecution(async);
 
+            // 3> 构建出一个流程上下文
             ProcessContext processContext = contextBuilder.build();
 
+            // 4> 状态机支持持久化 并且 state日志存储组件不为null
             if (instance.getStateMachine().isPersist() && stateMachineConfig.getStateLogStore() != null) {
+                // 记录状态机启动事件的日志（其中包含对开启事务的处理）
                 stateMachineConfig.getStateLogStore().recordStateMachineStarted(instance, processContext);
             }
+
+            // 5> 生成一个状态机实例ID
             if (StringUtils.isEmpty(instance.getId())) {
                 instance.setId(
                     stateMachineConfig.getSeqGenerator().generate(DomainConstants.SEQ_ENTITY_STATE_MACHINE_INST));
@@ -165,25 +192,32 @@ public class ProcessCtrlStateMachineEngine implements StateMachineEngine {
 
     private StateMachineInstance createMachineInstance(String stateMachineName, String tenantId, String businessKey,
                                                        Map<String, Object> startParams) {
+        // 基于状态机仓储组件 根据状态机名称和租户ID 查询状态机
+        //    优先根据状态机名称和租户ID从内存Map中获取，内存中获取不到再从DB中获取
         StateMachine stateMachine = stateMachineConfig.getStateMachineRepository().getStateMachine(stateMachineName,
             tenantId);
+        // 获取不到状态机抛出异常
         if (stateMachine == null) {
             throw new EngineExecutionException("StateMachine[" + stateMachineName + "] is not exists",
                 FrameworkErrorCode.ObjectNotExists);
         }
 
+        // 实例化一个状态机实例
         StateMachineInstanceImpl inst = new StateMachineInstanceImpl();
         inst.setStateMachine(stateMachine);
         inst.setMachineId(stateMachine.getId());
         inst.setTenantId(tenantId);
         inst.setBusinessKey(businessKey);
 
+        // 设置状态机实例启动参数
         inst.setStartParams(startParams);
         if (startParams != null) {
             if (StringUtils.hasText(businessKey)) {
                 startParams.put(DomainConstants.VAR_NAME_BUSINESSKEY, businessKey);
             }
 
+            // todo **状态机实例中的parentId是外部调用启动状态机实例时传入的！**
+            // 如果不传parentId，则saga事务会额外开启一个全局事务
             String parentId = (String)startParams.get(DomainConstants.VAR_NAME_PARENT_ID);
             if (StringUtils.hasText(parentId)) {
                 inst.setParentId(parentId);

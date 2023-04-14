@@ -30,6 +30,7 @@ public interface StateLogStore {
 
     /**
      * Record state machine startup events
+     * 记录下状态机启动事件的日志
      *
      * @param machineInstance
      */
@@ -37,6 +38,7 @@ public interface StateLogStore {
 
     /**
      * Record status end event
+     * 记录状态机完成事件的日志
      *
      * @param machineInstance
      */
@@ -44,6 +46,7 @@ public interface StateLogStore {
 
     /**
      * Record state machine restarted
+     * 记录状态机重启事件的日志
      *
      * @param machineInstance
      */
@@ -51,6 +54,7 @@ public interface StateLogStore {
 
     /**
      * Record state start execution event
+     * 记录状态启动事件的日志
      *
      * @param stateInstance
      */
@@ -58,6 +62,7 @@ public interface StateLogStore {
 
     /**
      * Record state execution end event
+     * 记录状态完成事件的日志
      *
      * @param stateInstance
      */
@@ -65,6 +70,7 @@ public interface StateLogStore {
 
     /**
      * Get state machine instance
+     * 根据状态机实例ID获取状态机实例
      *
      * @param stateMachineInstanceId
      * @return
@@ -73,6 +79,7 @@ public interface StateLogStore {
 
     /**
      * Get state machine instance by businessKey
+     * 根据业务Key获取状态机实例
      *
      * @param businessKey
      * @param tenantId
@@ -82,6 +89,7 @@ public interface StateLogStore {
 
     /**
      * Query the list of state machine instances by parent id
+     * 根据parentId获取所有的子状态机实例
      *
      * @param parentId
      * @return
@@ -90,6 +98,7 @@ public interface StateLogStore {
 
     /**
      * Get state instance
+     * 根据状态机实例ID和状态ID查询状态实例
      *
      * @param stateInstanceId
      * @param machineInstId
@@ -99,6 +108,7 @@ public interface StateLogStore {
 
     /**
      * Get a list of state instances by state machine instance id
+     * 根据状态机实例ID获取所有的状态实例
      *
      * @param stateMachineInstanceId
      * @return

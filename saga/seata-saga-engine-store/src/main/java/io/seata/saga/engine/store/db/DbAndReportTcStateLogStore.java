@@ -68,33 +68,51 @@ import org.springframework.util.StringUtils;
  */
 public class DbAndReportTcStateLogStore extends AbstractStore implements StateLogStore {
 
-    private static final Logger                                   LOGGER                       = LoggerFactory.getLogger(
+    private static final Logger LOGGER = LoggerFactory.getLogger(
             DbAndReportTcStateLogStore.class);
+    // 状态机实例插入的SQL语句
     private static final StateMachineInstanceToStatementForInsert STATE_MACHINE_INSTANCE_TO_STATEMENT_FOR_INSERT
-                                                                                               = new StateMachineInstanceToStatementForInsert();
+            = new StateMachineInstanceToStatementForInsert();
+    // 状态机实例更新的SQL语句
     private static final StateMachineInstanceToStatementForUpdate STATE_MACHINE_INSTANCE_TO_STATEMENT_FOR_UPDATE
-                                                                                               = new StateMachineInstanceToStatementForUpdate();
-    private static final ResultSetToStateMachineInstance          RESULT_SET_TO_STATE_MACHINE_INSTANCE
-                                                                                               = new ResultSetToStateMachineInstance();
-    private static final StateInstanceToStatementForInsert        STATE_INSTANCE_TO_STATEMENT_FOR_INSERT
-                                                                                               = new StateInstanceToStatementForInsert();
-    private static final StateInstanceToStatementForUpdate        STATE_INSTANCE_TO_STATEMENT_FOR_UPDATE
-                                                                                               = new StateInstanceToStatementForUpdate();
-    private static final ResultSetToStateInstance                 RESULT_SET_TO_STATE_INSTANCE = new ResultSetToStateInstance();
+            = new StateMachineInstanceToStatementForUpdate();
+    // 状态机实例的SQL语句查询结果
+    private static final ResultSetToStateMachineInstance RESULT_SET_TO_STATE_MACHINE_INSTANCE
+            = new ResultSetToStateMachineInstance();
+    // 状态实例插入的SQL语句
+    private static final StateInstanceToStatementForInsert STATE_INSTANCE_TO_STATEMENT_FOR_INSERT
+            = new StateInstanceToStatementForInsert();
+    // 状态实例更新的SQL语句
+    private static final StateInstanceToStatementForUpdate STATE_INSTANCE_TO_STATEMENT_FOR_UPDATE
+            = new StateInstanceToStatementForUpdate();
+    // 状态实例的SQL语句查询结果
+    private static final ResultSetToStateInstance RESULT_SET_TO_STATE_INSTANCE = new ResultSetToStateInstance();
+    // saga事务模板
     private SagaTransactionalTemplate sagaTransactionalTemplate;
-    private Serializer<Object, String>    paramsSerializer    = new ParamsSerializer();
+    // 参数序列化器
+    private Serializer<Object, String> paramsSerializer = new ParamsSerializer();
+    // 异常序列化器
     private Serializer<Exception, byte[]> exceptionSerializer = new ExceptionSerializer();
+    // 日志存储组件内的SQL语句集
     private StateLogStoreSqls stateLogStoreSqls;
-    private String            defaultTenantId;
-    private SeqGenerator      seqGenerator;
+    // 默认租户ID
+    private String defaultTenantId;
+    // 序号生成组件
+    private SeqGenerator seqGenerator;
 
     @Override
     public void recordStateMachineStarted(StateMachineInstance machineInstance, ProcessContext context) {
         if (machineInstance != null) {
             //if parentId is not null, machineInstance is a SubStateMachine, do not start a new global transaction,
             //use parent transaction instead.
+            /**
+             * 1、如果parentId是空，则当前状态机实例 是一个saga分支事务启动的入口
+             * 2、如果parentId不为空，则说明已经有一个服务用状态机实例启动了saga分支事务
+             *     即：状态机可以存在多个服务中，下游的状态机会有parentId，用于记录上游状态机的ID
+             */
             String parentId = machineInstance.getParentId();
             if (StringUtils.isEmpty(parentId)) {
+                // 1> 开启全局事务
                 beginTransaction(machineInstance, context);
             }
 
@@ -109,14 +127,14 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
                 // save to db
                 machineInstance.setSerializedStartParams(paramsSerializer.serialize(machineInstance.getStartParams()));
                 int effect = executeUpdate(stateLogStoreSqls.getRecordStateMachineStartedSql(dbType),
-                    STATE_MACHINE_INSTANCE_TO_STATEMENT_FOR_INSERT, machineInstance);
+                        STATE_MACHINE_INSTANCE_TO_STATEMENT_FOR_INSERT, machineInstance);
                 if (effect < 1) {
                     throw new StoreException("StateMachineInstance record start error, Xid: " + machineInstance.getId(),
-                        FrameworkErrorCode.OperationDenied);
+                            FrameworkErrorCode.OperationDenied);
                 }
             } catch (StoreException e) {
                 LOGGER.error("Record statemachine start error: {}, StateMachine: {}, XID: {}, Reason: {}",
-                    e.getErrcode(), machineInstance.getStateMachine().getName(), machineInstance.getId(), e.getMessage(), e);
+                        e.getErrcode(), machineInstance.getStateMachine().getName(), machineInstance.getId(), e.getMessage(), e);
                 this.clearUp();
                 throw e;
             }
@@ -127,10 +145,12 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
         if (sagaTransactionalTemplate != null) {
             StateMachineConfig stateMachineConfig = (StateMachineConfig) context.getVariable(
                     DomainConstants.VAR_NAME_STATEMACHINE_CONFIG);
+            // 事务信息
             TransactionInfo transactionInfo = new TransactionInfo();
             transactionInfo.setTimeOut(stateMachineConfig.getTransOperationTimeout());
             transactionInfo.setName(Constants.SAGA_TRANS_NAME_PREFIX + machineInstance.getStateMachine().getName());
             try {
+                // 开启全局事务，用saga事务模板（`SagaTransactionalTemplate`）
                 GlobalTransaction globalTransaction = sagaTransactionalTemplate.beginTransaction(transactionInfo);
                 machineInstance.setId(globalTransaction.getXid());
 
@@ -147,8 +167,7 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
                 throw new EngineExecutionException(e,
                         e.getCode() + ", TransName:" + transactionInfo.getName() + ", XID: " + xid + ", Reason: " + e
                                 .getMessage(), FrameworkErrorCode.TransactionManagerError);
-            }
-            finally {
+            } finally {
                 if (Boolean.TRUE.equals(context.getVariable(DomainConstants.VAR_NAME_IS_ASYNC_EXECUTION))) {
                     RootContext.unbind();
                     RootContext.unbindBranchType();
@@ -226,10 +245,10 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
                 sagaTransactionalTemplate.reportTransaction(globalTransaction, globalStatus);
             } catch (ExecutionException e) {
                 LOGGER.error("Report transaction finish to server error: {}, StateMachine: {}, XID: {}, Reason: {}",
-                    e.getCode(), machineInstance.getStateMachine().getName(), machineInstance.getId(), e.getMessage(), e);
+                        e.getCode(), machineInstance.getStateMachine().getName(), machineInstance.getId(), e.getMessage(), e);
             } catch (TransactionException e) {
                 LOGGER.error("Report transaction finish to server error: {}, StateMachine: {}, XID: {}, Reason: {}",
-                    e.getCode(), machineInstance.getStateMachine().getName(), machineInstance.getId(), e.getMessage(), e);
+                        e.getCode(), machineInstance.getStateMachine().getName(), machineInstance.getId(), e.getMessage(), e);
             } finally {
                 // clear
                 RootContext.unbind();
@@ -285,12 +304,12 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
             stateInstance.setSerializedInputParams(paramsSerializer.serialize(stateInstance.getInputParams()));
             if (!isUpdateMode) {
                 executeUpdate(stateLogStoreSqls.getRecordStateStartedSql(dbType),
-                    STATE_INSTANCE_TO_STATEMENT_FOR_INSERT, stateInstance);
+                        STATE_INSTANCE_TO_STATEMENT_FOR_INSERT, stateInstance);
             } else {
                 // if this retry/compensate state do not need persist, just update last inst
                 executeUpdate(stateLogStoreSqls.getUpdateStateExecutionStatusSql(dbType),
-                    stateInstance.getStatus().name(), new Timestamp(System.currentTimeMillis()),
-                    stateInstance.getMachineInstanceId(), stateInstance.getId());
+                        stateInstance.getStatus().name(), new Timestamp(System.currentTimeMillis()),
+                        stateInstance.getMachineInstanceId(), stateInstance.getId());
             }
         }
     }
@@ -301,7 +320,7 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
                     DomainConstants.VAR_NAME_STATEMACHINE_CONFIG);
 
             if (stateMachineConfig instanceof DbStateMachineConfig
-                    && !((DbStateMachineConfig)stateMachineConfig).isSagaBranchRegisterEnable()) {
+                    && !((DbStateMachineConfig) stateMachineConfig).isSagaBranchRegisterEnable()) {
                 if (LOGGER.isDebugEnabled()) {
                     LOGGER.debug("sagaBranchRegisterEnable = false, skip register branch. state[" + stateInstance.getName() + "]");
                 }
@@ -357,6 +376,7 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
     /**
      * generate retry state instance id based on original state instance id
      * ${originalStateInstanceId}.${retryCount}
+     *
      * @param stateInstance
      * @return
      */
@@ -380,6 +400,7 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
     /**
      * generate compensate state instance id based on original state instance id
      * ${originalStateInstanceId}-${retryCount}
+     *
      * @param stateInstance
      * @return
      */
@@ -419,10 +440,10 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
     }
 
     private boolean isUpdateMode(StateInstance stateInstance, ProcessContext context) {
-        DefaultStateMachineConfig stateMachineConfig = (DefaultStateMachineConfig)context.getVariable(
-            DomainConstants.VAR_NAME_STATEMACHINE_CONFIG);
+        DefaultStateMachineConfig stateMachineConfig = (DefaultStateMachineConfig) context.getVariable(
+                DomainConstants.VAR_NAME_STATEMACHINE_CONFIG);
         StateInstruction instruction = context.getInstruction(StateInstruction.class);
-        ServiceTaskStateImpl state = (ServiceTaskStateImpl)instruction.getState(context);
+        ServiceTaskStateImpl state = (ServiceTaskStateImpl) instruction.getState(context);
         StateMachine stateMachine = stateInstance.getStateMachineInstance().getStateMachine();
 
         if (StringUtils.hasLength(stateInstance.getStateIdRetriedFor())) {
@@ -466,7 +487,7 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
             StateMachineConfig stateMachineConfig = (StateMachineConfig) context.getVariable(
                     DomainConstants.VAR_NAME_STATEMACHINE_CONFIG);
             if (!(stateMachineConfig instanceof DbStateMachineConfig
-                    && !((DbStateMachineConfig)stateMachineConfig).isRmReportSuccessEnable()
+                    && !((DbStateMachineConfig) stateMachineConfig).isRmReportSuccessEnable()
                     && ExecutionStatus.SU.equals(stateInstance.getStatus()))) {
                 branchReport(stateInstance, context);
             }
@@ -479,7 +500,7 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
                     DomainConstants.VAR_NAME_STATEMACHINE_CONFIG);
 
             if (stateMachineConfig instanceof DbStateMachineConfig
-                    && !((DbStateMachineConfig)stateMachineConfig).isSagaBranchRegisterEnable()) {
+                    && !((DbStateMachineConfig) stateMachineConfig).isSagaBranchRegisterEnable()) {
                 if (LOGGER.isDebugEnabled()) {
                     LOGGER.debug("sagaBranchRegisterEnable = false, skip branch report. state[" + stateInstance.getName() + "]");
                 }
@@ -511,7 +532,7 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
 
                 if (isUpdateMode(stateInstance, context)) {
                     originalStateInst = stateInstance.getStateMachineInstance().getStateMap().get(
-                        stateInstance.getStateIdCompensatedFor());
+                            stateInstance.getStateIdCompensatedFor());
                 } else {
                     originalStateInst = findOutOriginalStateInstanceOfCompensateState(stateInstance);
                 }

@@ -31,6 +31,7 @@ public class EvaluatorFactoryManager {
 
     public static final String EVALUATOR_TYPE_DEFAULT = "Default";
 
+    // 类型 -> 表达式计算组件工厂
     private Map<String, EvaluatorFactory> evaluatorFactoryMap = new ConcurrentHashMap<>();
 
     public EvaluatorFactory getEvaluatorFactory(String type) {

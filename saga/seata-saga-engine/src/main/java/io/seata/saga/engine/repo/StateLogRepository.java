@@ -29,6 +29,7 @@ public interface StateLogRepository {
 
     /**
      * Get state machine instance
+     * 根据状态机实例ID，获取一个具体的状态机实例
      *
      * @param stateMachineInstanceId
      * @return
@@ -37,6 +38,7 @@ public interface StateLogRepository {
 
     /**
      * Get state machine instance by businessKey
+     * 根据业务key获取一个具体的状态机实例
      *
      * @param businessKey
      * @param tenantId
@@ -46,6 +48,7 @@ public interface StateLogRepository {
 
     /**
      * Query the list of state machine instances by parent id
+     * 根据parentId去获取所有的子状态机实例
      *
      * @param parentId
      * @return
@@ -54,6 +57,7 @@ public interface StateLogRepository {
 
     /**
      * Get state instance
+     * 根据状态实例ID获取状态实例
      *
      * @param stateInstanceId
      * @param machineInstId
@@ -63,6 +67,7 @@ public interface StateLogRepository {
 
     /**
      * Get a list of state instances by state machine instance id
+     * 根据状态机实例ID获取所有的状态实例
      *
      * @param stateMachineInstanceId
      * @return
