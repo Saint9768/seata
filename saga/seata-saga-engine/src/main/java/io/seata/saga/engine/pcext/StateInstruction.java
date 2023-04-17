@@ -58,6 +58,7 @@ public class StateInstruction implements Instruction {
             return temporaryState;
         }
 
+        // 获取状态名称
         String stateName = getStateName();
         String stateMachineName = getStateMachineName();
         String tenantId = getTenantId();

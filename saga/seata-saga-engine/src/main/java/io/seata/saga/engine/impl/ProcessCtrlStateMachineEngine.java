@@ -170,12 +170,15 @@ public class ProcessCtrlStateMachineEngine implements StateMachineEngine {
                     stateMachineConfig.getSeqGenerator().generate(DomainConstants.SEQ_ENTITY_STATE_MACHINE_INST));
             }
 
+            // 拿到 状态操作指南
             StateInstruction stateInstruction = processContext.getInstruction(StateInstruction.class);
+            // 获取State和Loop（循环策略）
             Loop loop = LoopTaskUtils.getLoopConfig(processContext, stateInstruction.getState(processContext));
             if (null != loop) {
                 stateInstruction.setTemporaryState(new LoopStartStateImpl());
             }
 
+            // 异步
             if (async) {
                 stateMachineConfig.getAsyncProcessCtrlEventPublisher().publish(processContext);
             } else {

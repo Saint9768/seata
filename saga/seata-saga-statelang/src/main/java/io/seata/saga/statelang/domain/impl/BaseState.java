@@ -31,7 +31,9 @@ public abstract class BaseState implements State {
     private String type;
     private String comment;
     private String next;
+    // 状态的扩展属性
     private Map<String, Object> extensions;
+    // 状态所属的状态机
     private transient StateMachine stateMachine;
 
     @Override

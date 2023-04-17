@@ -28,19 +28,33 @@ import io.seata.saga.statelang.domain.TaskState;
  */
 public abstract class AbstractTaskState extends BaseState implements TaskState {
 
+    // 补偿状态
     private String compensateState;
+    // 是否用于补偿
     private boolean isForCompensation;
+    // 是否用于更新
     private boolean isForUpdate;
+    // Retry重试列表
     private List<Retry> retry;
+    // 异常匹配列表
     private List<ExceptionMatch> catches;
+    // 状态输入列表
     private List<Object> input;
+    // 输出数据Map
     private Map<String, Object> output;
+    // 状态Map
     private Map<String, String> status;//Map<String/* expression */, String /* status */>
+    // 输入表达式列表
     private List<Object> inputExpressions;
+    // 输出表达式列表
     private Map<String, Object> outputExpressions;
+    // 是否持久化
     private boolean isPersist = true;
+    // 是否重试持久化模式更新
     private Boolean retryPersistModeUpdate;
+    // 是否补偿持久化模式更新
     private Boolean compensatePersistModeUpdate;
+    // 循环策略
     private Loop loop;
 
     @Override
@@ -168,10 +182,15 @@ public abstract class AbstractTaskState extends BaseState implements TaskState {
 
     public static class RetryImpl implements Retry {
 
+        // 重试过程中遇到的异常列表
         private List<String> exceptions;
+        // 异常Class
         private List<Class<? extends Exception>> exceptionClasses;
+        // 重试间隔，单位：秒
         private double intervalSeconds;
+        // 最大重试次数
         private int maxAttempts;
+        // 回退比例
         private double backoffRate;
 
         @Override

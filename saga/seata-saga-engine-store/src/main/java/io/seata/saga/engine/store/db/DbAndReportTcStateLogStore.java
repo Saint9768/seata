@@ -100,6 +100,11 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
     // 序号生成组件
     private SeqGenerator seqGenerator;
 
+    /**
+     * 开启saga全局事务、记录状态机实例已经开始日志数据到DB
+     * @param machineInstance
+     * @param context
+     */
     @Override
     public void recordStateMachineStarted(StateMachineInstance machineInstance, ProcessContext context) {
         if (machineInstance != null) {
@@ -125,6 +130,7 @@ public class DbAndReportTcStateLogStore extends AbstractStore implements StateLo
                 RootContext.bindBranchType(BranchType.SAGA);
 
                 // save to db
+                // 2> 插入状态机实例数据到DB
                 machineInstance.setSerializedStartParams(paramsSerializer.serialize(machineInstance.getStartParams()));
                 int effect = executeUpdate(stateLogStoreSqls.getRecordStateMachineStartedSql(dbType),
                         STATE_MACHINE_INSTANCE_TO_STATEMENT_FOR_INSERT, machineInstance);

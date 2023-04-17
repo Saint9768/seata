@@ -188,35 +188,35 @@ public interface TaskState extends State {
 
         /**
          * parallel size, default 1
-         *
+         * state并行度（默认1）：代表同时开启的线程数
          * @return
          */
         int getParallel();
 
         /**
          * collection object name
-         *
+         * 获取集合对象名称
          * @return
          */
         String getCollection();
 
         /**
          * element variable name
-         *
+         * 获取元素变量名称
          * @return
          */
         String getElementVariableName();
 
         /**
          * element variable index name, default loopCounter
-         *
+         * 获取元素索引名称
          * @return
          */
         String getElementIndexName();
 
         /**
          * completion condition, default nrOfInstances == nrOfCompletedInstances
-         *
+         * 获取完成条件
          * @return
          */
         String getCompletionCondition();
