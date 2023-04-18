@@ -37,8 +37,10 @@ public class CustomizeBusinessProcessor implements BusinessProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CustomizeBusinessProcessor.class);
 
+    // 默认只有一个K-V，key:STATE_LANG, value:StateMachineProcessHandler
     private Map<String, ProcessHandler> processHandlers;
 
+    // 默认只有一个K-V，key:STATE_LANG, value:DefaultRouterHandler
     private Map<String, RouterHandler> routerHandlers;
 
     public static ProcessType matchProcessType(ProcessContext context) {
@@ -60,6 +62,7 @@ public class CustomizeBusinessProcessor implements BusinessProcessor {
             throw new FrameworkException(FrameworkErrorCode.ProcessTypeNotFound);
         }
 
+        // processor实现：StateMachineProcessHandler
         ProcessHandler processor = processHandlers.get(processType.getCode());
         if (processor == null) {
             LOGGER.error("Cannot find process handler by type {}, context= {}", processType.getCode(), context);
@@ -80,6 +83,7 @@ public class CustomizeBusinessProcessor implements BusinessProcessor {
             return;
         }
 
+        // router实现：DefaultRouterHandler
         RouterHandler router = routerHandlers.get(processType.getCode());
         if (router == null) {
             LOGGER.error("Cannot find router handler by type {}, context= {}", processType.getCode(), context);

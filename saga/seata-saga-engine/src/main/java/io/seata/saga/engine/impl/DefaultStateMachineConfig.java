@@ -227,7 +227,7 @@ public class DefaultStateMachineConfig implements StateMachineConfig, Applicatio
             // 创建流程控制器
             ProcessControllerImpl processorController = createProcessorController(syncEventPublisher);
 
-            // 流程控制事件消费者组件
+            // 流程控制事件消费者组件（todo 用于消费EventBus中的事件）
             ProcessCtrlEventConsumer processCtrlEventConsumer = new ProcessCtrlEventConsumer();
             processCtrlEventConsumer.setProcessController(processorController);
 
