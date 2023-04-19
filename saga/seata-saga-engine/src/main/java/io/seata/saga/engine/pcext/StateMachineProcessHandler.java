@@ -48,10 +48,16 @@ public class StateMachineProcessHandler implements ProcessHandler {
     @Override
     public void process(ProcessContext context) throws FrameworkException {
         StateInstruction instruction = context.getInstruction(StateInstruction.class);
+        // 拿到起始状态
         State state = instruction.getState(context);
         String stateType = state.getType();
+        /**
+         * 状态处理器
+         * ServiceTask对应的StateHandler为 ServiceTaskStateHandler
+         */
         StateHandler stateHandler = stateHandlers.get(stateType);
 
+        // 状态处理拦截器
         List<StateHandlerInterceptor> interceptors = null;
         if (stateHandler instanceof InterceptableStateHandler) {
             interceptors = ((InterceptableStateHandler)stateHandler).getInterceptors();
@@ -68,6 +74,7 @@ public class StateMachineProcessHandler implements ProcessHandler {
                 }
             }
 
+            // 处理
             stateHandler.process(context);
 
         } catch (Exception e) {

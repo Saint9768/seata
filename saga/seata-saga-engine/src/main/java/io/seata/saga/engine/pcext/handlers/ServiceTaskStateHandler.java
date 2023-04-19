@@ -88,6 +88,7 @@ public class ServiceTaskStateHandler implements StateHandler, InterceptableState
                 StateMachineConfig stateMachineConfig = (StateMachineConfig) context.getVariable(
                         DomainConstants.VAR_NAME_STATEMACHINE_CONFIG);
 
+                // 服务执行器，默认仅有一个实现：SpringBeanServiceInvoker
                 ServiceInvoker serviceInvoker = stateMachineConfig.getServiceInvokerManager().getServiceInvoker(
                         state.getServiceType());
                 if (serviceInvoker == null) {
@@ -99,6 +100,7 @@ public class ServiceTaskStateHandler implements StateHandler, InterceptableState
                             stateMachineConfig.getApplicationContext());
                 }
 
+                // 服务执行
                 result = serviceInvoker.invoke(state, input.toArray());
             }
 
