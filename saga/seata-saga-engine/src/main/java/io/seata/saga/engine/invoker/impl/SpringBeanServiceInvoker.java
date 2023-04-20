@@ -60,6 +60,7 @@ public class SpringBeanServiceInvoker implements ServiceInvoker, ApplicationCont
     @Override
     public Object invoke(ServiceTaskState serviceTaskState, Object... input) throws Throwable {
         ServiceTaskStateImpl state = (ServiceTaskStateImpl) serviceTaskState;
+        // 是否异步执行
         if (state.isAsync()) {
             if (threadPoolExecutor == null) {
                 if (LOGGER.isWarnEnabled()) {
@@ -68,6 +69,7 @@ public class SpringBeanServiceInvoker implements ServiceInvoker, ApplicationCont
                                     + "synchronously now. stateName: {}",
                             state.getServiceName(), state.getServiceMethod(), state.getName());
                 }
+                // 异步执行，线程池为空时，走当前线程同步执行
                 return doInvoke(state, input);
             }
 
@@ -93,6 +95,7 @@ public class SpringBeanServiceInvoker implements ServiceInvoker, ApplicationCont
 
     protected Object doInvoke(ServiceTaskStateImpl state, Object[] input) throws Throwable {
 
+        // 从Spring容器中获取serviceName对应的Bean
         Object bean = applicationContext.getBean(state.getServiceName());
 
         Method method = state.getMethod();
@@ -114,6 +117,8 @@ public class SpringBeanServiceInvoker implements ServiceInvoker, ApplicationCont
                     FrameworkErrorCode.NoSuchMethod);
 
         }
+
+        // 构造方法参数
 
         Object[] args = new Object[method.getParameterCount()];
         try {
@@ -138,6 +143,7 @@ public class SpringBeanServiceInvoker implements ServiceInvoker, ApplicationCont
         Map<Retry, AtomicInteger> retryCountMap = new HashMap<>();
         while (true) {
             try {
+                // 执行方法
                 return invokeMethod(bean, method, args);
             } catch (Throwable e) {
                 Retry matchedRetryConfig = matchRetryConfig(state.getRetry(), e);

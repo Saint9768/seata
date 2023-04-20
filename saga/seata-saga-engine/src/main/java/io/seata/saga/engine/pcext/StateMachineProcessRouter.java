@@ -46,6 +46,7 @@ public class StateMachineProcessRouter implements ProcessRouter {
     @Override
     public Instruction route(ProcessContext context) throws FrameworkException {
 
+        // 状态指示
         StateInstruction stateInstruction = context.getInstruction(StateInstruction.class);
 
         State state;
@@ -62,6 +63,7 @@ public class StateMachineProcessRouter implements ProcessRouter {
 
         String stateType = state.getType();
 
+        // 拿到状态路由器
         StateRouter router = stateRouters.get(stateType);
 
         Instruction instruction = null;

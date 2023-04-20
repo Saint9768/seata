@@ -96,6 +96,7 @@ public class TaskStateRouter implements StateRouter {
 
         StateMachine stateMachine = state.getStateMachine();
 
+        // 获取下一个状态
         State nextState = stateMachine.getState(next);
         if (nextState == null) {
             throw new EngineExecutionException("Next state[" + next + "] is not exits",

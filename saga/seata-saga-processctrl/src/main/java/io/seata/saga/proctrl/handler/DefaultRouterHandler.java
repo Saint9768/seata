@@ -60,6 +60,7 @@ public class DefaultRouterHandler implements RouterHandler {
                 throw new FrameworkException(FrameworkErrorCode.ProcessTypeNotFound);
             }
 
+            // processRouters中默认只有一个KV，StateMachineProcessRouter
             ProcessRouter processRouter = processRouters.get(processType.getCode());
             if (processRouter == null) {
                 LOGGER.error("Cannot find process router by type {}, context = {}", processType.getCode(), context);
@@ -72,6 +73,7 @@ public class DefaultRouterHandler implements RouterHandler {
             } else {
                 context.setInstruction(instruction);
 
+                // 事件异步执行，具体处理在ChoiceStateHandler
                 eventPublisher.publish(context);
             }
         } catch (FrameworkException e) {
